@@ -1,0 +1,39 @@
+# ===== FIRST-TIME SETUP =====
+
+npm create vite@latest frontend -- --template react               # Latest React project generator
+cd frontend                                                      # Navigate to the frontend folder
+npm install                                                      # Install all template dependencies
+
+
+# ===== APPLICATION PACKAGES =====
+
+npm install axios                                               # Backend API requests (streaming will use fetch)
+npm install react-router-dom                                    # Login/chat/profile/settings routes
+npm install react-toastify                                      # Success/error notifications
+
+
+# ===== UI PACKAGES (REUSE RMS STYLE) =====
+
+npm install bootstrap                                           # Responsive layout/styles
+npm install @fortawesome/fontawesome-free                       # Icons
+npm install @mui/material @emotion/react @emotion/styled         # UI components/dialogs
+
+
+# ===== AI CHAT DISPLAY =====
+
+npm install react-markdown                                      # Render AI responses as Markdown
+npm install remark-gfm                                          # Markdown tables, lists and other GFM features
+npm install react-syntax-highlighter                            # Highlight code in AI responses
+
+
+# ===== DEVELOPMENT (LATER) =====
+
+# npm run dev                                                   # Frontend development server
+# Press Ctrl+C to stop
+
+
+# ===== COMPLETION CHECKS (LATER) =====
+
+# npm run build                                                 # Production build
+
+

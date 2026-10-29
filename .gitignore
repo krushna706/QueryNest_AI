@@ -1,0 +1,48 @@
+
+# =====================================
+# BACKEND
+# =====================================
+
+# Dependencies
+/backend/node_modules/
+
+# Environment variables
+/backend/.env
+/backend/.env.*
+
+# Backend logs
+/backend/*.log
+
+
+# =====================================
+# FRONTEND
+# =====================================
+
+# Dependencies
+/frontend/node_modules/
+
+# Environment variables
+/frontend/.env
+/frontend/.env.*
+
+# Build files
+/frontend/dist/
+
+# Frontend logs
+/frontend/*.log
+
+
+# =====================================
+# ROOT / COMMON
+# =====================================
+
+# Debug logs
+*.log
+npm-debug.log*
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/

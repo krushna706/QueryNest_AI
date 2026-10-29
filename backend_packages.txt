@@ -1,0 +1,66 @@
+# ===== FIRST-TIME SETUP =====
+
+cd backend                                                   # Navigate to the backend folder
+npm init -y                                                  # Create package.json; first time only
+
+
+# ===== SERVER AND DATABASE =====
+
+npm install express                                             # API server and routing
+npm install mongoose                                            # MongoDB models, queries and vector-search aggregation
+
+
+# ===== VALIDATION AND CONFIGURATION =====
+
+npm install joi                                                 # Backend request validation
+npm install dotenv                                              # Read backend .env values
+
+
+# ===== AUTHENTICATION =====
+
+npm install jsonwebtoken                                        # JWT authentication
+npm install bcrypt                                              # Hash and compare passwords
+npm install cookie-parser                                       # Read HttpOnly auth cookies
+npm install-scripts approve bcrypt
+
+
+# ===== ACCESS AND SECURITY =====
+
+npm install cors                                                # Allow approved frontend origins
+npm install helmet                                              # Security HTTP headers
+npm install express-rate-limit                                  # Login, signup, chat and upload rate limits
+
+
+# ===== FILE UPLOADS AND PROFILE PICTURE =====
+
+npm install multer                                              # Receive PDF and profile image uploads
+npm install file-type                                          # Check actual uploaded file signatures
+npm install cloudinary                                          # Upload/delete profile pictures only
+
+
+# ===== AI PROVIDERS =====
+
+npm install groq-sdk                                            # Groq GPT-OSS chat requests and streaming
+npm install @google/genai                                       # Gemini chat and embedding API
+npm install-scripts approve @google/genai protobufjs
+
+
+# ===== PDF / RAG / TOKEN BUDGET =====
+
+npm install pdf-parse                                           # Extract text and page data from PDFs
+npm install js-tiktoken                                         # Approximate token counting for budgets/chunks
+
+
+# ===== RUN SCRIPTS SETUP =====
+
+npm pkg set scripts.dev="nodemon server.js"                     # Development server
+npm pkg set scripts.start="node server.js"                      # Production server
+npm pkg set main="server.js"                                    # Entry file metadata
+
+
+# ===== RUN BACKEND (LATER) =====
+# Only after server.js, app.js and .env have been configured.
+
+# npm run dev                                                   # Development server
+# npm start                                                     # Production startup
+
