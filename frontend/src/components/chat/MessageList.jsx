@@ -1,13 +1,5 @@
 
-import {
-    Children,
-    isValidElement,
-    memo,
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { memo } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -40,29 +32,9 @@ function formatMessageTime(date) {
     });
 }
 
-// ================== EXTRACT CODE TEXT ==================
-function extractCodeText(children) {
-    if (typeof children === "string") {
-        return children;
-    }
-
-    if (typeof children === "number") {
-        return String(children);
-    }
-
-    if (Array.isArray(children)) {
-        return children.map(extractCodeText).join("");
-    }
-
-    if (isValidElement(children)) {
-        return extractCodeText(children.props.children);
-    }
-
-    return "";
-}
-
 // ================== MARKDOWN COMPONENTS ==================
 const markdownComponents = {
+
     // ================== HEADINGS ==================
     h1: ({ node, ...props }) => (
         <h2
@@ -166,43 +138,43 @@ const markdownComponents = {
         </code>
     ),
 
-// ================== CODE BLOCK ==================
-pre: ({ node, children }) => {
-    const codeNode = node?.children?.find(
-        (child) =>
-            child.type === "element" &&
-            child.tagName === "code"
-    );
+    // ================== CODE BLOCK ==================
+    pre: ({ node, children }) => {
+        const codeNode = node?.children?.find(
+            (child) =>
+                child.type === "element" &&
+                child.tagName === "code"
+        );
 
-    if (!codeNode) {
-        return <pre>{children}</pre>;
-    }
+        if (!codeNode) {
+            return <pre>{children}</pre>;
+        }
 
-    // ================== LANGUAGE ==================
-    const rawClass = codeNode.properties?.className;
+        // ================== LANGUAGE ==================
+        const rawClass = codeNode.properties?.className;
 
-    const className = Array.isArray(rawClass)
-        ? rawClass.join(" ")
-        : String(rawClass || "");
+        const className = Array.isArray(rawClass)
+            ? rawClass.join(" ")
+            : String(rawClass || "");
 
-    const language =
-        className.match(/language-([a-z0-9+#.-]+)/i)?.[1] ||
-        "text";
+        const language =
+            className.match(/language-([a-z0-9+#.-]+)/i)?.[1] ||
+            "text";
 
-    // ================== CODE CONTENT ==================
-    const codeText = (codeNode.children || [])
-        .map((child) =>
-            child.type === "text" ? child.value : ""
-        )
-        .join("");
+        // ================== CODE CONTENT ==================
+        const codeText = (codeNode.children || [])
+            .map((child) =>
+                child.type === "text" ? child.value : ""
+            )
+            .join("");
 
-    return (
-        <CodeBlock
-            language={language}
-            code={codeText}
-        />
-    );
-},
+        return (
+            <CodeBlock
+                language={language}
+                code={codeText}
+            />
+        );
+    },
 
     // ================== BLOCKQUOTE ==================
     blockquote: ({ node, ...props }) => (
@@ -302,18 +274,18 @@ pre: ({ node, children }) => {
     ),
 
     // ================== IMAGE REFERENCES ==================
-    // Do not automatically load remote images from AI content.
     img: ({ alt }) => (
-        <span>{alt ? `[Image: ${alt}]` : "[Image]"}</span>
+        <span>
+            {alt ? `[Image: ${alt}]` : "[Image]"}
+        </span>
     ),
 };
 
 // ================== MESSAGE ITEM ==================
 const MessageItem = memo(function MessageItem({
     item,
-    copied,
-    onCopy,
 }) {
+    // ================== MESSAGE DETAILS ==================
     const isAssistant = item.role === "assistant";
 
     const content =
@@ -326,6 +298,7 @@ const MessageItem = memo(function MessageItem({
     const statusMessage =
         MESSAGE_STATUSES[status] || "";
 
+    // ================== PROVIDER NAME ==================
     const providerName =
         item.provider === "groq"
             ? "Groq"
@@ -411,66 +384,20 @@ const MessageItem = memo(function MessageItem({
             )}
 
             {/* ================== RESPONSE STATUS ================== */}
-            {isAssistant && status !== "completed" && statusMessage && (
-                <span
-                    className="conversation-message-error"
-                    style={
-                        ["queued", "streaming"].includes(status)
-                            ? { color: "#637b96" }
-                            : undefined
-                    }
-                >
-                    {statusMessage}
-                </span>
-            )}
-
-            {/* ================== COPY RESPONSE ================== */}
-            {isAssistant && content.trim() && (
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        padding: "0 4px",
-                    }}
-                >
-                    <button
-                        type="button"
-                        onClick={() =>
-                            onCopy(item._id, content)
+            {isAssistant &&
+                status !== "completed" &&
+                statusMessage && (
+                    <span
+                        className="conversation-message-error"
+                        style={
+                            ["queued", "streaming"].includes(status)
+                                ? { color: "#637b96" }
+                                : undefined
                         }
-                        aria-label="Copy AI response"
-                        title="Copy response"
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "7px",
-                            padding: "5px 9px",
-                            border: "1px solid #dce5ef",
-                            borderRadius: "7px",
-                            color: copied
-                                ? "#0f766e"
-                                : "#627a98",
-                            background: "#ffffff",
-                            fontFamily: "inherit",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                        }}
                     >
-                        <i
-                            className={
-                                copied
-                                    ? "fa-solid fa-check"
-                                    : "fa-regular fa-copy"
-                            }
-                            aria-hidden="true"
-                        />
-
-                        {copied ? "Copied" : "Copy Response"}
-                    </button>
-                </div>
-            )}
+                        {statusMessage}
+                    </span>
+                )}
         </article>
     );
 });
@@ -482,42 +409,6 @@ function MessageList({
     loadingMore = false,
     onLoadMore,
 }) {
-    // ================== COPY STATE ==================
-    const [copiedMessageId, setCopiedMessageId] = useState(null);
-
-    const copyTimerRef = useRef(null);
-
-    // ================== CLEANUP TIMER ==================
-    useEffect(() => {
-        return () => {
-            if (copyTimerRef.current) {
-                clearTimeout(copyTimerRef.current);
-            }
-        };
-    }, []);
-
-    // ================== COPY RESPONSE ==================
-    const handleCopyResponse = useCallback(
-        async (messageId, content) => {
-            if (copyTimerRef.current) {
-                clearTimeout(copyTimerRef.current);
-            }
-
-            try {
-                await navigator.clipboard.writeText(content);
-
-                setCopiedMessageId(messageId);
-
-                copyTimerRef.current = setTimeout(() => {
-                    setCopiedMessageId(null);
-                }, 2000);
-            } catch {
-                setCopiedMessageId(null);
-            }
-        },
-        []
-    );
-
     return (
         <div className="conversation-message-list">
 
@@ -558,8 +449,6 @@ function MessageList({
                 <MessageItem
                     key={item._id}
                     item={item}
-                    copied={copiedMessageId === item._id}
-                    onCopy={handleCopyResponse}
                 />
             ))}
         </div>
