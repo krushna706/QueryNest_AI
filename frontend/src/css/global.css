@@ -1,0 +1,88 @@
+
+/* ================== GLOBAL RESET ================== */
+:root {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #18243b;
+    background-color: #ffffff;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: light;
+
+    --primary-color: #075bff;
+    --primary-dark: #0647c9;
+    --secondary-color: #7928ff;
+    --accent-color: #00d5ff;
+    --navy-color: #07133d;
+    --text-color: #18243b;
+    --muted-color: #64748b;
+    --border-color: #dce5f2;
+    --background-color: #f4f7fc;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    display: block;
+    margin: 0;
+    min-width: 320px;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: #ffffff;
+}
+
+#root {
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+}
+
+/* ================== COMMON ELEMENTS ================== */
+img {
+    max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+}
+
+/* ================== TEXT SELECTION ================== */
+::selection {
+    color: #ffffff;
+    background-color: var(--primary-color);
+}
+
+
+/* ================== REDUCED MOTION ================== */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}

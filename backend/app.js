@@ -7,6 +7,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/authRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 
 const csrfMiddleware = require("./middleware/csrfMiddleware");
 const ExpressError = require("./utils/ExpressError");
@@ -94,8 +95,16 @@ app.get("/api/health", (req, res) => {
     });
 });
 
+
+
+
 // ================== API ROUTES ==================
 app.use("/api/auth", authRoutes);
+app.use("/api/chats", chatRoutes);
+
+
+
+
 
 // ================== FRONTEND SERVING ==================
 if (process.env.SERVE_FRONTEND === "true") {

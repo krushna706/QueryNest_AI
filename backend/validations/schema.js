@@ -138,6 +138,100 @@ const forgotPasswordResetSchema = Joi.object({
     .required()
     .unknown(false);
 
+// ================== CHAT MESSAGE VALIDATION ==================
+const chatMessageSchema = Joi.object({
+    content: Joi.string()
+        .trim()
+        .min(1)
+        .max(100000)
+        .required()
+        .messages({
+            "string.empty": "Message cannot be empty.",
+            "string.min": "Message cannot be empty.",
+            "string.max": "Message is too long.",
+            "any.required": "Message is required.",
+        }),
+
+    clientRequestId: Joi.string()
+        .guid({ version: "uuidv4" })
+        .required()
+        .messages({
+            "string.guid": "Invalid request identifier.",
+            "any.required": "Request identifier is required.",
+        }),
+})
+    .required()
+    .unknown(false);
+
+// ================== RENAME CONVERSATION VALIDATION ==================
+const renameConversationSchema = Joi.object({
+    title: Joi.string()
+        .trim()
+        .min(1)
+        .max(120)
+        .required()
+        .messages({
+            "string.empty": "Conversation title is required.",
+            "string.min": "Conversation title cannot be empty.",
+            "string.max": "Title cannot exceed 120 characters.",
+            "any.required": "Conversation title is required.",
+        }),
+})
+    .required()
+    .unknown(false);
+
+// ================== CONVERSATION ID VALIDATION ==================
+const conversationParamsSchema = Joi.object({
+    conversationId: Joi.string()
+        .hex()
+        .length(24)
+        .required()
+        .messages({
+            "string.hex": "Invalid conversation ID.",
+            "string.length": "Invalid conversation ID.",
+            "any.required": "Conversation ID is required.",
+        }),
+})
+    .required()
+    .unknown(false);
+
+// ================== CHAT HISTORY VALIDATION ==================
+const chatHistoryQuerySchema = Joi.object({
+    search: Joi.string()
+        .trim()
+        .max(120)
+        .allow("")
+        .default(""),
+
+    cursor: Joi.string()
+        .max(256)
+        .optional(),
+
+    limit: Joi.number()
+        .integer()
+        .min(1)
+        .max(50)
+        .default(20),
+})
+    .required()
+    .unknown(false);
+
+// ================== MESSAGE HISTORY VALIDATION ==================
+const messageHistoryQuerySchema = Joi.object({
+    before: Joi.string()
+        .hex()
+        .length(24)
+        .optional(),
+
+    limit: Joi.number()
+        .integer()
+        .min(1)
+        .max(50)
+        .default(20),
+})
+    .required()
+    .unknown(false);
+
 // ================== EXPORTS ==================
 module.exports = {
     signupSchema,
@@ -145,4 +239,9 @@ module.exports = {
     forgotPasswordRequestSchema,
     forgotPasswordVerifySchema,
     forgotPasswordResetSchema,
+    chatMessageSchema,
+    renameConversationSchema,
+    conversationParamsSchema,
+    chatHistoryQuerySchema,
+    messageHistoryQuerySchema,
 };
