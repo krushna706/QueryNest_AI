@@ -5,13 +5,22 @@ import {
     useRef,
     useState,
 } from "react";
-import { Link, useParams } from "react-router-dom";
+
+import {
+    Link,
+    useLocation,
+    useNavigate,
+    useParams,
+} from "react-router-dom";
+
 import { toast } from "react-toastify";
 
 import MessageComposer from "../components/chat/MessageComposer";
+import MessageList from "../components/chat/MessageList";
 
 import {
     generateChatRequestId,
+    generateAIResponse,
     getConversation,
     getMessageHistory,
     sendMessage,
@@ -20,42 +29,80 @@ import {
 // ================== CONFIGURATION ==================
 const MESSAGE_LIMIT = 20;
 
+const RETRYABLE_STATUSES = new Set([
+    "failed",
+    "stopped",
+    "incomplete",
+]);
+
+// ================== ERROR MESSAGE ==================
+function getErrorMessage(error, fallback) {
+    return (
+        error?.response?.data?.message ||
+        error?.message ||
+        fallback
+    );
+}
+
 // ================== CONVERSATION ==================
 function Conversation() {
     const { conversationId } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
 
+    // ================== CONVERSATION STATE ==================
     const [conversation, setConversation] = useState(null);
     const [messages, setMessages] = useState([]);
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
 
+    // ================== REQUEST STATE ==================
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [sending, setSending] = useState(false);
+    const [queuePosition, setQueuePosition] = useState(null);
     const [error, setError] = useState("");
 
+    // ================== PAGINATION STATE ==================
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState(null);
     const [reloadKey, setReloadKey] = useState(0);
 
+    // ================== REFERENCES ==================
     const messagesRef = useRef(null);
     const inputRef = useRef(null);
     const requestIdRef = useRef(null);
-    const sendingRef = useRef(false);
+    const busyRef = useRef(false);
+    const streamControllerRef = useRef(null);
+    const autoStartedRef = useRef(null);
     const scrollToBottomRef = useRef(true);
     const restoreScrollRef = useRef(null);
+    const conversationIdRef = useRef(conversationId);
+
+    // ================== STOP OLD STREAM ==================
+    useEffect(() => {
+        conversationIdRef.current = conversationId;
+
+        return () => {
+            streamControllerRef.current?.abort();
+            streamControllerRef.current = null;
+            busyRef.current = false;
+        };
+    }, [conversationId]);
 
     // ================== LOAD CONVERSATION ==================
     useEffect(() => {
         let active = true;
 
-        const loadConversation = async () => {
+        async function loadConversation() {
             setLoading(true);
             setError("");
             setConversation(null);
             setMessages([]);
             setHasMore(false);
             setNextCursor(null);
+            setQueuePosition(null);
+            setSending(false);
 
             scrollToBottomRef.current = true;
             restoreScrollRef.current = null;
@@ -73,9 +120,11 @@ function Conversation() {
 
                 setConversation(conversationData.conversation);
                 setMessages(messageData.messages || []);
+
                 setHasMore(
                     Boolean(messageData.pagination?.hasMore)
                 );
+
                 setNextCursor(
                     messageData.pagination?.nextCursor || null
                 );
@@ -83,15 +132,17 @@ function Conversation() {
                 if (!active) return;
 
                 setError(
-                    error.response?.data?.message ||
-                    "Unable to load conversation."
+                    getErrorMessage(
+                        error,
+                        "Unable to load conversation."
+                    )
                 );
             } finally {
                 if (active) {
                     setLoading(false);
                 }
             }
-        };
+        }
 
         loadConversation();
 
@@ -104,7 +155,9 @@ function Conversation() {
     useEffect(() => {
         setMessage("");
         setAttachments([]);
+
         requestIdRef.current = null;
+        autoStartedRef.current = null;
     }, [conversationId]);
 
     // ================== SCROLL MANAGEMENT ==================
@@ -113,8 +166,10 @@ function Conversation() {
 
         if (!container) return;
 
+        // ================== RESTORE SCROLL ==================
         if (restoreScrollRef.current) {
-            const { height, top } = restoreScrollRef.current;
+            const { height, top } =
+                restoreScrollRef.current;
 
             container.scrollTop =
                 container.scrollHeight - height + top;
@@ -123,14 +178,26 @@ function Conversation() {
             return;
         }
 
+        // ================== SCROLL TO BOTTOM ==================
         if (scrollToBottomRef.current) {
             container.scrollTop = container.scrollHeight;
             scrollToBottomRef.current = false;
         }
     }, [messages]);
 
+    // ================== CHECK SCROLL POSITION ==================
+    function markScrollIfNearBottom() {
+        const container = messagesRef.current;
+
+        scrollToBottomRef.current =
+            !container ||
+            container.scrollHeight -
+                container.scrollTop -
+                container.clientHeight < 110;
+    }
+
     // ================== LOAD EARLIER MESSAGES ==================
-    const handleLoadMore = async () => {
+    async function handleLoadMore() {
         if (
             !hasMore ||
             !nextCursor ||
@@ -161,6 +228,7 @@ function Conversation() {
                 };
             }
 
+            // ================== MERGE MESSAGES ==================
             setMessages((current) => {
                 const existingIds = new Set(
                     current.map((item) => item._id)
@@ -170,47 +238,276 @@ function Conversation() {
                     (item) => !existingIds.has(item._id)
                 );
 
-                return [...uniqueMessages, ...current];
+                return [
+                    ...uniqueMessages,
+                    ...current,
+                ];
             });
 
             setHasMore(
                 Boolean(response.pagination?.hasMore)
             );
+
             setNextCursor(
                 response.pagination?.nextCursor || null
             );
         } catch (error) {
             toast.error(
-                error.response?.data?.message ||
-                "Unable to load earlier messages."
+                getErrorMessage(
+                    error,
+                    "Unable to load earlier messages."
+                )
             );
         } finally {
             setLoadingMore(false);
         }
-    };
+    }
+
+    // ================== AI STREAM ==================
+    async function runAIStream(
+        userMessageId,
+        { regenerate = false } = {}
+    ) {
+        const controller = new AbortController();
+        const activeConversationId = conversationId;
+
+        streamControllerRef.current = controller;
+
+        let assistantMessageId = null;
+        let assistantHasContent = false;
+        let finished = false;
+
+        setQueuePosition(null);
+
+        try {
+            await generateAIResponse(
+                activeConversationId,
+                userMessageId,
+                {
+                    signal: controller.signal,
+                    regenerate,
+
+                    // ================== HANDLE STREAM EVENTS ==================
+                    onEvent: ({ type, data }) => {
+                        if (
+                            controller.signal.aborted ||
+                            conversationIdRef.current !==
+                                activeConversationId
+                        ) {
+                            return;
+                        }
+
+                        // ================== QUEUED ==================
+                        if (type === "queued") {
+                            setQueuePosition(
+                                data?.position || 1
+                            );
+                            return;
+                        }
+
+                        // ================== START ==================
+                        if (
+                            type === "start" &&
+                            data?.messageId
+                        ) {
+                            assistantMessageId = data.messageId;
+
+                            setQueuePosition(null);
+                            markScrollIfNearBottom();
+
+                            setMessages((current) => {
+                                const exists = current.some(
+                                    (item) =>
+                                        item._id === data.messageId
+                                );
+
+                                if (exists) {
+                                    return current;
+                                }
+
+                                return [
+                                    ...current,
+                                    {
+                                        _id: data.messageId,
+                                        conversationId:
+                                            activeConversationId,
+                                        replyToMessageId:
+                                            userMessageId,
+                                        role: "assistant",
+                                        content: "",
+                                        status: "queued",
+                                        provider: null,
+                                        model: null,
+                                        createdAt:
+                                            new Date().toISOString(),
+                                    },
+                                ];
+                            });
+
+                            return;
+                        }
+
+                        // ================== PROVIDER ==================
+                        if (
+                            type === "provider" &&
+                            assistantMessageId
+                        ) {
+                            setMessages((current) =>
+                                current.map((item) =>
+                                    item._id === assistantMessageId
+                                        ? {
+                                              ...item,
+                                              provider:
+                                                  data?.provider || null,
+                                              model:
+                                                  data?.model || null,
+                                              status: "streaming",
+                                          }
+                                        : item
+                                )
+                            );
+
+                            return;
+                        }
+
+                        // ================== RESPONSE DELTA ==================
+                        if (
+                            type === "delta" &&
+                            assistantMessageId
+                        ) {
+                            const text =
+                                typeof data?.text === "string"
+                                    ? data.text
+                                    : "";
+
+                            if (!text) return;
+
+                            assistantHasContent = true;
+                            markScrollIfNearBottom();
+
+                            setMessages((current) =>
+                                current.map((item) =>
+                                    item._id === assistantMessageId
+                                        ? {
+                                              ...item,
+                                              content:
+                                                  item.content + text,
+                                              status: "streaming",
+                                          }
+                                        : item
+                                )
+                            );
+
+                            return;
+                        }
+
+                        // ================== COMPLETE ==================
+                        if (
+                            type === "done" &&
+                            assistantMessageId
+                        ) {
+                            finished = true;
+
+                            setMessages((current) =>
+                                current.map((item) =>
+                                    item._id === assistantMessageId
+                                        ? {
+                                              ...item,
+                                              status:
+                                                  data?.status ||
+                                                  "incomplete",
+                                              provider:
+                                                  data?.provider ||
+                                                  item.provider,
+                                              model:
+                                                  data?.model ||
+                                                  item.model,
+                                          }
+                                        : item
+                                )
+                            );
+                        }
+                    },
+                }
+            );
+        } catch (error) {
+            const stopped = controller.signal.aborted;
+
+            // ================== UPDATE FAILED MESSAGE ==================
+            if (
+                assistantMessageId &&
+                conversationIdRef.current ===
+                    activeConversationId
+            ) {
+                setMessages((current) =>
+                    current.map((item) =>
+                        item._id === assistantMessageId &&
+                        !finished
+                            ? {
+                                  ...item,
+                                  status: stopped
+                                      ? "stopped"
+                                      : assistantHasContent
+                                        ? "incomplete"
+                                        : "failed",
+                              }
+                            : item
+                    )
+                );
+            }
+
+            // ================== ERROR NOTIFICATION ==================
+            if (
+                !stopped &&
+                conversationIdRef.current ===
+                    activeConversationId
+            ) {
+                toast.error(
+                    getErrorMessage(
+                        error,
+                        "AI generation failed. Please retry."
+                    )
+                );
+            }
+        } finally {
+            // ================== CLEANUP ==================
+            if (streamControllerRef.current === controller) {
+                streamControllerRef.current = null;
+                setQueuePosition(null);
+            }
+        }
+    }
 
     // ================== MESSAGE INPUT ==================
-    const handleMessageChange = (event) => {
+    function handleMessageChange(event) {
         setMessage(event.target.value);
         requestIdRef.current = null;
-    };
+    }
 
     // ================== ATTACHMENTS ==================
-    const handleAttachmentsChange = (files) => {
+    function handleAttachmentsChange(files) {
         setAttachments(files);
-    };
+    }
 
     // ================== SEND MESSAGE ==================
-    const handleSubmit = async (event) => {
+    async function handleSubmit(event) {
         event.preventDefault();
 
-        if (sendingRef.current || loading) return;
+        if (
+            busyRef.current ||
+            loading ||
+            !conversation
+        ) {
+            return;
+        }
 
         const content = message.trim();
 
-        if (!content && !attachments.length) return;
+        if (!content && !attachments.length) {
+            return;
+        }
 
-        // Document upload API integration is pending.
+        // ================== DOCUMENTS PENDING ==================
         if (attachments.length > 0) {
             toast.info(
                 "PDF and Word document sending will be available after upload integration."
@@ -218,16 +515,21 @@ function Conversation() {
             return;
         }
 
-        sendingRef.current = true;
+        busyRef.current = true;
         setSending(true);
 
+        const activeConversationId = conversationId;
+
         try {
+            // ================== REQUEST ID ==================
             if (!requestIdRef.current) {
-                requestIdRef.current = generateChatRequestId();
+                requestIdRef.current =
+                    generateChatRequestId();
             }
 
+            // ================== SAVE USER MESSAGE ==================
             const response = await sendMessage(
-                conversationId,
+                activeConversationId,
                 content,
                 requestIdRef.current
             );
@@ -235,61 +537,206 @@ function Conversation() {
             const savedMessage = response.userMessage;
 
             if (!savedMessage?._id) {
-                throw new Error("Message was not returned.");
+                throw new Error(
+                    "Saved message was not returned."
+                );
             }
 
+            if (
+                conversationIdRef.current !==
+                activeConversationId
+            ) {
+                return;
+            }
+
+            // ================== UPDATE CHAT ==================
             scrollToBottomRef.current = true;
 
             setMessages((current) => {
                 const alreadyExists = current.some(
-                    (item) => item._id === savedMessage._id
+                    (item) =>
+                        item._id === savedMessage._id
                 );
 
                 if (alreadyExists) {
                     return current;
                 }
 
-                return [...current, savedMessage];
+                return [
+                    ...current,
+                    savedMessage,
+                ];
             });
 
+            // ================== RESET INPUT ==================
             setMessage("");
             requestIdRef.current = null;
 
-            inputRef.current?.focus();
+            // ================== START AI RESPONSE ==================
+            await runAIStream(savedMessage._id);
         } catch (error) {
-            toast.error(
-                error.response?.data?.message ||
-                error.message ||
-                "Unable to send message. Please try again."
-            );
+            if (
+                conversationIdRef.current ===
+                activeConversationId
+            ) {
+                toast.error(
+                    getErrorMessage(
+                        error,
+                        "Unable to send message. Please retry."
+                    )
+                );
+            }
         } finally {
-            sendingRef.current = false;
-            setSending(false);
+            if (
+                conversationIdRef.current ===
+                activeConversationId
+            ) {
+                busyRef.current = false;
+                setSending(false);
+
+                inputRef.current?.focus();
+            }
         }
-    };
+    }
 
-    // ================== MESSAGE TIME ==================
-    const formatTime = (date) => {
-        if (!date) return "";
+    // ================== GENERATE / RETRY / REGENERATE ==================
+    async function handleGenerateSavedMessage(
+        userMessageId,
+        { regenerate = false } = {}
+    ) {
+        if (busyRef.current || loading) {
+            return;
+        }
 
-        const value = new Date(date);
+        busyRef.current = true;
+        setSending(true);
 
-        if (Number.isNaN(value.getTime())) return "";
+        const activeConversationId = conversationId;
 
-        return value.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
+        try {
+            await runAIStream(userMessageId, {
+                regenerate,
+            });
+        } finally {
+            if (
+                conversationIdRef.current ===
+                activeConversationId
+            ) {
+                busyRef.current = false;
+                setSending(false);
+            }
+        }
+    }
+
+    // ================== INITIAL CHAT HANDOFF ==================
+    useEffect(() => {
+        const pendingId =
+            location.state?.autoGenerateMessageId;
+
+        if (
+            !pendingId ||
+            loading ||
+            !conversation ||
+            error
+        ) {
+            return;
+        }
+
+        const key = `${conversationId}:${pendingId}`;
+
+        if (autoStartedRef.current === key) {
+            return;
+        }
+
+        // ================== FIND CURRENT MESSAGE ==================
+        const latestUser = [...messages]
+            .reverse()
+            .find((item) => item.role === "user");
+
+        if (
+            !latestUser ||
+            latestUser._id !== pendingId
+        ) {
+            return;
+        }
+
+        autoStartedRef.current = key;
+
+        // ================== CLEAR NAVIGATION STATE ==================
+        navigate(location.pathname, {
+            replace: true,
+            state: null,
         });
-    };
+
+        // ================== CHECK EXISTING RESPONSE ==================
+        const existingReply = messages.some(
+            (item) =>
+                item.role === "assistant" &&
+                item.replyToMessageId === pendingId &&
+                !RETRYABLE_STATUSES.has(item.status)
+        );
+
+        if (!existingReply) {
+            void handleGenerateSavedMessage(pendingId);
+        }
+    }, [
+        conversationId,
+        conversation,
+        error,
+        loading,
+        location.pathname,
+        location.state,
+        messages,
+        navigate,
+    ]);
+
+    // ================== LATEST USER MESSAGE ==================
+    const lastUserMessage = [...messages]
+        .reverse()
+        .find((item) => item.role === "user");
+
+    // ================== LATEST AI RESPONSE ==================
+    const lastReply = lastUserMessage
+        ? [...messages]
+              .reverse()
+              .find(
+                  (item) =>
+                      item.role === "assistant" &&
+                      item.replyToMessageId ===
+                          lastUserMessage._id
+              )
+        : null;
+
+    // ================== GENERATE / RETRY AVAILABILITY ==================
+    const canGenerateReply = Boolean(
+        lastUserMessage &&
+        !sending &&
+        (
+            !lastReply ||
+            RETRYABLE_STATUSES.has(lastReply.status)
+        )
+    );
+
+    // ================== REGENERATE AVAILABILITY ==================
+    const canRegenerateReply = Boolean(
+        lastUserMessage &&
+        lastReply?.status === "completed" &&
+        !sending &&
+        !loading
+    );
 
     // ================== LOADING ==================
     if (loading) {
         return (
-            <div className="conversation-feedback" role="status">
+            <div
+                className="conversation-feedback"
+                role="status"
+            >
                 <i
                     className="fa-solid fa-spinner fa-spin"
                     aria-hidden="true"
                 />
+
                 <p>Loading conversation...</p>
             </div>
         );
@@ -314,13 +761,18 @@ function Conversation() {
                     type="button"
                     className="btn btn-primary"
                     onClick={() =>
-                        setReloadKey((current) => current + 1)
+                        setReloadKey(
+                            (current) => current + 1
+                        )
                     }
                 >
                     Try Again
                 </button>
 
-                <Link to="/chat" className="btn btn-link">
+                <Link
+                    to="/chat"
+                    className="btn btn-link"
+                >
                     New Chat
                 </Link>
             </div>
@@ -346,85 +798,108 @@ function Conversation() {
                 role="log"
                 aria-label="Conversation messages"
             >
-                <div className="conversation-message-list">
-
-                    {/* Earlier Messages */}
-                    {hasMore && (
-                        <div className="conversation-load-more">
-                            <button
-                                type="button"
-                                onClick={handleLoadMore}
-                                disabled={loadingMore}
-                            >
-                                {loadingMore
-                                    ? "Loading..."
-                                    : "Load Earlier Messages"}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Empty Conversation */}
-                    {messages.length === 0 && (
-                        <div className="conversation-empty">
-                            <i
-                                className="fa-regular fa-comments"
-                                aria-hidden="true"
-                            />
-
-                            <h2>Start your conversation</h2>
-
-                            <p>
-                                Type a message to begin.
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Messages */}
-                    {messages.map((item) => (
-                        <article
-                            key={item._id}
-                            className={`conversation-message conversation-message-${item.role}`}
-                        >
-                            <div className="conversation-message-heading">
-                                <span>
-                                    {item.role === "user"
-                                        ? "You"
-                                        : "QueryNest AI"}
-                                </span>
-
-                                <time dateTime={item.createdAt}>
-                                    {formatTime(item.createdAt)}
-                                </time>
-                            </div>
-
-                            <div className="conversation-message-content">
-                                {item.content}
-                            </div>
-
-                            {item.status === "failed" && (
-                                <span className="conversation-message-error">
-                                    Message processing failed.
-                                </span>
-                            )}
-                        </article>
-                    ))}
-                </div>
+                <MessageList
+                    messages={messages}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onLoadMore={handleLoadMore}
+                />
             </div>
 
-            {/* ================== MESSAGE COMPOSER ================== */}
+            {/* ================== STREAM CONTROLS ================== */}
             <div className="conversation-composer-wrap">
+
+                {/* ================== STOP GENERATION ================== */}
+                {sending && (
+                    <div
+                        className="conversation-load-more"
+                        role="status"
+                    >
+                        <button
+                            type="button"
+                            onClick={() =>
+                                streamControllerRef.current?.abort()
+                            }
+                            disabled={!streamControllerRef.current}
+                        >
+                            <i
+                                className="fa-solid fa-stop"
+                                aria-hidden="true"
+                            />
+                            {" "}
+                            Stop Generation
+
+                            {queuePosition
+                                ? ` · Queue #${queuePosition}`
+                                : ""}
+                        </button>
+                    </div>
+                )}
+
+                {/* ================== RETRY AI RESPONSE ================== */}
+                {canGenerateReply && (
+                    <div className="conversation-load-more">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleGenerateSavedMessage(
+                                    lastUserMessage._id
+                                )
+                            }
+                        >
+                            <i
+                                className="fa-solid fa-rotate-right"
+                                aria-hidden="true"
+                            />
+                            {" "}
+                            {lastReply
+                                ? "Retry AI Response"
+                                : "Generate AI Response"}
+                        </button>
+                    </div>
+                )}
+
+                {/* ================== REGENERATE AI RESPONSE ================== */}
+                {canRegenerateReply && (
+                    <div className="conversation-load-more">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleGenerateSavedMessage(
+                                    lastUserMessage._id,
+                                    {
+                                        regenerate: true,
+                                    }
+                                )
+                            }
+                            aria-label="Regenerate AI response"
+                        >
+                            <i
+                                className="fa-solid fa-arrows-rotate"
+                                aria-hidden="true"
+                            />
+                            {" "}
+                            Regenerate Response
+                        </button>
+                    </div>
+                )}
+
+                {/* ================== MESSAGE COMPOSER ================== */}
                 <MessageComposer
                     inputId="conversation-message"
                     inputRef={inputRef}
                     value={message}
                     onChange={handleMessageChange}
                     attachments={attachments}
-                    onAttachmentsChange={handleAttachmentsChange}
+                    onAttachmentsChange={
+                        handleAttachmentsChange
+                    }
                     onSubmit={handleSubmit}
                     placeholder="Message QueryNest AI..."
                     sending={sending}
                 />
 
+                {/* ================== FOOTNOTE ================== */}
                 <p className="chat-dashboard-note">
                     QueryNest AI can make mistakes.
                     Verify important information.
@@ -434,4 +909,5 @@ function Conversation() {
     );
 }
 
+// ================== EXPORT ==================
 export default Conversation;

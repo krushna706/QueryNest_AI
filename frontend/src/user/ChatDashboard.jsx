@@ -44,15 +44,19 @@ function ChatDashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
 
+    // ================== STATE ==================
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
     const [sending, setSending] = useState(false);
 
+    // ================== REFERENCES ==================
     const inputRef = useRef(null);
     const sendingRef = useRef(false);
     const requestIdRef = useRef(null);
 
-    const firstName = user?.name?.trim().split(/\s+/)[0] || "there";
+    // ================== USER NAME ==================
+    const firstName =
+        user?.name?.trim().split(/\s+/)[0] || "there";
 
     // ================== MESSAGE INPUT ==================
     const handleMessageChange = (event) => {
@@ -79,13 +83,16 @@ function ChatDashboard() {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
+        // ================== PREVENT DUPLICATE SUBMIT ==================
         if (sendingRef.current) return;
 
         const content = message.trim();
 
-        if (!content && !attachments.length) return;
+        if (!content && !attachments.length) {
+            return;
+        }
 
-        // Documents will be sent after upload API integration.
+        // ================== DOCUMENTS PENDING ==================
         if (attachments.length > 0) {
             toast.info(
                 "PDF and Word document sending will be available after upload integration."
@@ -93,35 +100,70 @@ function ChatDashboard() {
             return;
         }
 
+        // ================== START REQUEST ==================
         sendingRef.current = true;
         setSending(true);
 
         try {
+            // ================== REQUEST ID ==================
             if (!requestIdRef.current) {
-                requestIdRef.current = generateChatRequestId();
+                requestIdRef.current =
+                    generateChatRequestId();
             }
 
+            // ================== SAVE FIRST MESSAGE ==================
             const response = await createConversation(
                 content,
                 requestIdRef.current
             );
 
-            const conversationId = response.conversation?._id;
+            const conversationId =
+                response.conversation?._id;
 
+            const initialMessageId =
+                response.initialMessage?._id;
+
+            // ================== VALIDATE CONVERSATION ==================
             if (!conversationId) {
-                throw new Error("Conversation ID was not returned.");
+                throw new Error(
+                    "Conversation ID was not returned."
+                );
             }
 
+            // ================== HANDLE MISSING MESSAGE ID ==================
+            // The conversation may have been created successfully.
+            // Do not create another conversation by retrying automatically.
+            if (!initialMessageId) {
+                toast.info(
+                    "Conversation created. Open the chat to generate the AI response."
+                );
+
+                navigate(`/chat/${conversationId}`, {
+                    replace: true,
+                });
+
+                return;
+            }
+
+            // ================== OPEN CONVERSATION ==================
+            // Pass the saved message ID to Conversation.jsx.
+            // The existing user message must not be saved again.
             navigate(`/chat/${conversationId}`, {
                 replace: true,
+                state: {
+                    autoGenerateMessageId: initialMessageId,
+                },
             });
+
         } catch (error) {
+            // ================== ERROR NOTIFICATION ==================
             toast.error(
                 error.response?.data?.message ||
                 error.message ||
                 "Unable to start conversation. Please try again."
             );
         } finally {
+            // ================== RESET REQUEST STATE ==================
             sendingRef.current = false;
             setSending(false);
         }
@@ -189,7 +231,9 @@ function ChatDashboard() {
                     value={message}
                     onChange={handleMessageChange}
                     attachments={attachments}
-                    onAttachmentsChange={handleAttachmentsChange}
+                    onAttachmentsChange={
+                        handleAttachmentsChange
+                    }
                     onSubmit={handleSubmit}
                     placeholder="Ask QueryNest AI anything..."
                     sending={sending}

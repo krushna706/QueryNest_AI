@@ -4,6 +4,20 @@ const mongoose = require("mongoose");
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const ExpressError = require("../utils/ExpressError");
+const { randomUUID } = require("node:crypto");
+
+const { identifyTask } = require("../services/ai/taskRouter");
+const { buildAIContext } = require("../services/ai/contextBuilder");
+const { streamAIResponse } = require("../services/ai/aiRouter");
+const { scheduleAIRequest } = require("../services/usage/requestScheduler");
+const {
+    reserveAIUsage,
+    startAIUsage,
+    finalizeAIUsage,
+    cancelReservedAIUsage,
+} = require("../services/usage/usageService");
+const { createStreamResponse } = require("../utils/streamResponse");
+
 
 // ================== CONVERSATION RESPONSE ==================
 function getConversationResponse(conversation) {
@@ -461,6 +475,390 @@ async function deleteConversation(req, res, next) {
     }
 }
 
+// ================== GENERATE AI RESPONSE ==================
+// POST /api/chats/:conversationId/generate
+// Body: { messageId, regenerate? } — user message must already be saved.
+async function generateAIResponse(req, res, next) {
+    try {
+        const userId = req.user._id;
+        const conversationId = req.conversation._id;
+        const messageId = req.body?.messageId;
+        const regenerate = req.body?.regenerate === true;
+
+        // ================== VALIDATE MESSAGE ID ==================
+        if (!mongoose.isValidObjectId(messageId)) {
+            throw new ExpressError(400, "Invalid user message ID.");
+        }
+
+        // ================== FETCH SAVED MESSAGE ==================
+        const userMessage = await Message.findOne({
+            _id: messageId,
+            userId,
+            conversationId,
+            role: "user",
+            status: "completed",
+        }).lean();
+
+        if (!userMessage) {
+            throw new ExpressError(404, "User message not found.");
+        }
+
+        // Only generate for the latest user message.
+        const latestUserMessage = await Message.findOne({
+            userId,
+            conversationId,
+            role: "user",
+        })
+            .sort({ createdAt: -1, _id: -1 })
+            .select("_id")
+            .lean();
+
+        if (String(latestUserMessage?._id) !== String(messageId)) {
+            throw new ExpressError(409, "Generate a reply for the latest message.");
+        }
+
+        // Document retrieval is a separate integration phase.
+        if (userMessage.attachmentIds?.length) {
+            throw new ExpressError(409, "Document processing is not available yet.");
+        }
+
+        // ================== IDENTIFY TASK ==================
+        const taskResult = identifyTask({
+            message: userMessage.content,
+            hasDocuments: false,
+            hasSourceText: false,
+        });
+
+        if (taskResult.needsClarification) {
+            throw new ExpressError(422, taskResult.clarification);
+        }
+
+        // ================== BUILD CONTEXT ==================
+        const context = await buildAIContext({
+            userId,
+            conversationId,
+            currentMessageId: messageId,
+            task: taskResult.task,
+            documentChunks: [],
+            maxInputTokens: 5000,
+        });
+
+        const maxOutputTokens = 2048;
+        const stream = createStreamResponse(req, res);
+
+        // ================== PER-REQUEST STATE ==================
+        let assistantMessage = null;
+        let attemptKey = null;
+        let attemptUsage = null;
+        let usageSettled = false;
+        let content = "";
+        let selectedProvider = null;
+        let selectedModel = null;
+        let finishReason = "unknown";
+        let lastCheckpoint = Date.now();
+
+        // ================== SAVE ANSWER PROGRESS ==================
+        async function persistAnswer(status) {
+            if (!assistantMessage) return;
+
+            const saved = await Message.updateOne(
+                {
+                    _id: assistantMessage._id,
+                    userId,
+                    conversationId,
+                    role: "assistant",
+                },
+                {
+                    $set: {
+                        content,
+                        status,
+                        provider: selectedProvider,
+                        model: selectedModel,
+                    },
+                }
+            );
+
+            if (saved.matchedCount !== 1) {
+                throw new ExpressError(404, "Conversation is no longer available.");
+            }
+
+            lastCheckpoint = Date.now();
+        }
+
+        // ================== SETTLE CURRENT PROVIDER ==================
+        async function settleProvider(status) {
+            if (!attemptKey || usageSettled) return;
+
+            await finalizeAIUsage({
+                attemptKey,
+                status,
+                usage: attemptUsage,
+            });
+
+            usageSettled = true;
+        }
+
+        // ================== RESERVE PROVIDER QUOTA ==================
+        async function reserveProvider({
+            provider,
+            estimatedInputTokens,
+            maxOutputTokens: outputTokens,
+        }) {
+            // A previous provider may have failed before output.
+            // Account for that attempt before starting fallback.
+            if (attemptKey && !usageSettled) {
+                await settleProvider("failed");
+            }
+
+            attemptKey = null;
+            attemptUsage = null;
+            usageSettled = false;
+
+            const key = randomUUID();
+            const reservation = await reserveAIUsage({
+                attemptKey: key,
+                userId,
+                provider,
+                task: taskResult.task,
+                estimatedInputTokens,
+                maxOutputTokens: outputTokens,
+            });
+
+            if (!reservation.allowed) {
+                return { allowed: false };
+            }
+
+            try {
+                // Consume one request once upstream dispatch starts.
+                await startAIUsage({ attemptKey: key });
+            } catch (error) {
+                await cancelReservedAIUsage({ attemptKey: key });
+                throw error;
+            }
+
+            attemptKey = key;
+            return { allowed: true };
+        }
+
+        // ================== GENERATE IN EXECUTION SLOT ==================
+        async function executeGeneration() {
+            // ================== RECHECK AFTER QUEUE ==================
+            // The user may have sent another message while waiting.
+            const latestSavedUser = await Message.findOne({
+                userId,
+                conversationId,
+                role: "user",
+            })
+                .sort({ createdAt: -1, _id: -1 })
+                .select("_id")
+                .lean();
+
+            if (String(latestSavedUser?._id) !== String(messageId)) {
+                throw new ExpressError(409, "Generate a reply for the latest message.");
+            }
+
+            // ================== CREATE RESPONSE ATOMICALLY ==================
+            // Updating the conversation and checking the latest attempt
+            // in one transaction helps serialize competing generations.
+            await mongoose.connection.transaction(async (session) => {
+                const activeConversation = await Conversation.findOneAndUpdate(
+                    {
+                        _id: conversationId,
+                        userId,
+                        status: "active",
+                    },
+                    { $set: { lastActivityAt: new Date() } },
+                    { session, returnDocument: "after" }
+                );
+
+                if (!activeConversation) {
+                    throw new ExpressError(404, "Conversation not found.");
+                }
+
+                // ================== CHECK PREVIOUS AI ATTEMPT ==================
+                const latestResponse = await Message.findOne({
+                    userId,
+                    conversationId,
+                    role: "assistant",
+                    replyToMessageId: messageId,
+                })
+                    .sort({ attemptNumber: -1, _id: -1 })
+                    .session(session)
+                    .lean();
+
+                // Never start another generation while one is pending.
+                if (["queued", "streaming"].includes(latestResponse?.status)) {
+                    throw new ExpressError(409, "An AI response is already in progress.");
+                }
+
+                if (regenerate) {
+                    // Regenerate only a successfully completed answer.
+                    // Failed, stopped, or incomplete attempts use Retry.
+                    if (latestResponse?.status !== "completed") {
+                        throw new ExpressError(
+                            409,
+                            "Only a completed AI response can be regenerated. Use Retry for an incomplete response."
+                        );
+                    }
+                } else if (latestResponse?.status === "completed") {
+                    throw new ExpressError(
+                        409,
+                        "An AI response already exists. Use Regenerate to create a new version."
+                    );
+                }
+
+                // ================== SAVE NEW RESPONSE VERSION ==================
+                const [created] = await Message.create(
+                    [{
+                        userId,
+                        conversationId,
+                        role: "assistant",
+                        replyToMessageId: messageId,
+                        attemptNumber: (latestResponse?.attemptNumber || 0) + 1,
+                        content: "",
+                        status: "queued",
+                    }],
+                    { session }
+                );
+
+                assistantMessage = created;
+            });
+
+            try {
+                await stream.send("start", {
+                    messageId: String(assistantMessage._id),
+                    replyToMessageId: String(messageId),
+                });
+
+                const events = streamAIResponse({
+                    task: taskResult.task,
+                    messages: context.messages,
+                    systemInstruction: context.systemInstruction,
+                    estimatedInputTokens: context.estimatedInputTokens,
+                    maxOutputTokens,
+                    reserveProvider,
+                    signal: stream.signal,
+                });
+
+                // ================== STREAM EVENTS ==================
+                for await (const event of events) {
+                    if (stream.signal.aborted) {
+                        throw new Error("Generation stopped.");
+                    }
+
+                    if (event.type === "provider") {
+                        selectedProvider = event.provider;
+                        selectedModel = event.model;
+
+                        await persistAnswer("streaming");
+
+                        await stream.send("provider", {
+                            provider: selectedProvider,
+                            model: selectedModel,
+                        });
+                    } else if (event.type === "delta") {
+                        if (content.length + event.text.length > 100000) {
+                            throw new ExpressError(413, "AI answer exceeds the message limit.");
+                        }
+
+                        content += event.text;
+
+                        // Save periodic checkpoints, not a DB write per token.
+                        if (content.length % 1000 < event.text.length ||
+                            Date.now() - lastCheckpoint >= 2000) {
+                            await persistAnswer("streaming");
+                        }
+
+                        await stream.send("delta", { text: event.text });
+                    } else if (event.type === "usage") {
+                        attemptUsage = {
+                            inputTokens: event.inputTokens,
+                            outputTokens: event.outputTokens,
+                            totalTokens: event.totalTokens,
+                        };
+                    } else if (event.type === "finish") {
+                        finishReason = event.reason;
+                    }
+                }
+
+                // A deleted conversation must never receive a late result.
+                const stillActive = await Conversation.exists({
+                    _id: conversationId,
+                    userId,
+                    status: "active",
+                });
+
+                if (!stillActive) {
+                    throw new ExpressError(404, "Conversation not found.");
+                }
+
+                const completed = Boolean(content.trim()) &&
+                    finishReason === "stop";
+                const finalStatus = completed ? "completed" : "incomplete";
+
+                await persistAnswer(finalStatus);
+                await settleProvider(finalStatus);
+
+                await stream.send("done", {
+                    messageId: String(assistantMessage._id),
+                    status: finalStatus,
+                    provider: selectedProvider,
+                    model: selectedModel,
+                    finishReason,
+                });
+            } catch (error) {
+                const cancelled = stream.signal.aborted;
+                const status = cancelled
+                    ? "stopped"
+                    : content.length ? "incomplete" : "failed";
+
+                // Preserve partial answers, but never recreate deleted records.
+                try {
+                    await persistAnswer(status);
+                } catch {
+                    // Conversation may already have been deleted.
+                }
+
+                try {
+                    await settleProvider(status);
+                } catch {
+                    // Leave unreconciled attempts for usage recovery.
+                }
+
+                throw error;
+            }
+        }
+
+        // ================== SCHEDULE GENERATION ==================
+        try {
+            await scheduleAIRequest({
+                userId,
+                signal: stream.signal,
+                onQueued: ({ position }) => {
+                    stream.send("queued", { position }).catch(() => {});
+                },
+                execute: executeGeneration,
+            });
+        } catch (error) {
+            if (!stream.isClosed()) {
+                const safeMessage = error instanceof ExpressError
+                    ? error.message
+                    : "AI generation failed. Please try again.";
+
+                try {
+                    await stream.send("error", { message: safeMessage });
+                } catch {
+                    // Client may already be disconnected.
+                }
+            }
+        } finally {
+            stream.end();
+        }
+    } catch (error) {
+        return next(error);
+    }
+}
+
 // ================== EXPORTS ==================
 module.exports = {
     createConversation,
@@ -470,4 +868,5 @@ module.exports = {
     addUserMessage,
     getMessageHistory,
     deleteConversation,
+    generateAIResponse,
 };

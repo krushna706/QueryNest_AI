@@ -13,7 +13,9 @@ const {
     conversationParamsSchema,
     chatHistoryQuerySchema,
     messageHistoryQuerySchema,
+    generateAISchema,
 } = require("../validations/schema");
+
 
 // ================== ROUTER SETUP ==================
 const router = express.Router();
@@ -76,6 +78,15 @@ router.get(
     ownershipMiddleware,
     validateMiddleware(messageHistoryQuerySchema, { source: "query" }),
     chatController.getMessageHistory
+);
+
+// ================== GENERATE AI RESPONSE ==================
+router.post(
+    "/:conversationId/generate",
+    validateMiddleware(conversationParamsSchema, { source: "params" }),
+    ownershipMiddleware,
+    validateMiddleware(generateAISchema),
+    chatController.generateAIResponse
 );
 
 // ================== EXPORT ==================
