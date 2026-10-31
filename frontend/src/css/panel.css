@@ -2369,3 +2369,690 @@
         transition: none !important;
     }
 }
+
+
+/* ================== PROFILE DASHBOARD ================== */
+.qnp-page {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: clamp(16px,2.6vw,34px);
+    padding-bottom: 56px;
+    background: #f5f7fc;
+    color: #223653;
+}
+.qnp-page * {
+    box-sizing: border-box;
+}
+.qnp-hero {
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+    padding: clamp(22px,3vw,34px);
+    border-radius: 21px;
+    border: 1px solid #233e67;
+    background: radial-gradient(circle at 85% 12%,rgba(91,109,230,.27),transparent 34%),radial-gradient(circle at 70% 110%,rgba(22,168,240,.14),transparent 34%),linear-gradient(120deg,#0e1c34,#142b4e 65%,#1b3460);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 14px 35px rgba(17,37,69,.12);
+}
+.qnp-hero::after {
+    content: "";
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    right: -95px;
+    top: -135px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.qnp-hero-user {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    min-width: 0;
+    z-index: 1;
+}
+.qnp-hero-avatar,.qnp-photo-avatar {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 22px;
+    color: #3d5f9a;
+}
+.qnp-hero-avatar {
+    width: 85px;
+    height: 85px;
+    border: 3px solid rgba(255,255,255,.85);
+    box-shadow: 0 8px 25px rgba(0,0,0,.16);
+}
+.qnp-photo-avatar {
+    width: 64px;
+    height: 64px;
+    border: 1px solid #e2e9f5;
+    border-radius: 16px;
+}
+.qnp-hero-avatar img,.qnp-photo-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+}
+.qnp-image-uploaded {
+    object-fit: cover;
+}
+.qnp-image-default {
+    object-fit: contain;
+}
+.qnp-initials {
+    font-weight: 750;
+    font-size: 22px;
+}
+.qnp-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: #a3bfe9;
+    margin: 0 0 7px;
+}
+.qnp-hero h1 {
+    font-size: clamp(21px,2.5vw,30px);
+    font-weight: 750;
+    letter-spacing: -.5px;
+    color: #fff;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    margin: 0 0 7px;
+}
+.qnp-hero-description {
+    margin: 0;
+    color: #b9c9e3;
+    font-size: 12px;
+    line-height: 1.8;
+}
+.qnp-hero-actions {
+    z-index: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.qnp-hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(188,211,255,.19);
+    border-radius: 10px;
+    background: rgba(255,255,255,.07);
+    color: #e0eaff;
+    text-decoration: none;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.qnp-hero-chip:hover {
+    color: #fff;
+    background: rgba(255,255,255,.13);
+}
+.qnp-main-grid {
+    display: grid;
+    grid-template-columns: minmax(320px,.95fr) minmax(0,1.55fr);
+    align-items: stretch;
+    gap: 20px;
+    margin-top: 20px;
+}
+.qnp-card {
+    min-width: 0;
+    height: 100%;
+    padding: clamp(18px,2.1vw,26px);
+    border: 1px solid #e1e7f1;
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 5px 22px rgba(28,48,83,.035);
+}
+.qnp-profile-card {
+    display: flex;
+    flex-direction: column;
+}
+.qnp-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+.qnp-heading h2 {
+    font-size: 16px;
+    font-weight: 750;
+    letter-spacing: -.2px;
+    color: #203653;
+    margin: 0;
+}
+.qnp-subtitle {
+    margin: 6px 0 0;
+    color: #8391a5;
+    font-size: 12px;
+    line-height: 1.7;
+}
+.qnp-heading-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 37px;
+    height: 37px;
+    border-radius: 11px;
+    background: #edf3fd;
+    color: #456ca9;
+    font-size: 15px;
+}
+.qnp-danger-icon {
+    background: #fff0f1;
+    color: #ba5563;
+}
+.qnp-photo-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 6px;
+}
+.qnp-photo-title {
+    font-size: 12px;
+    color: #344d6b;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+.qnp-note {
+    font-size: 11px;
+    color: #8998ac;
+    line-height: 1.75;
+    margin: 5px 0;
+}
+.qnp-divider {
+    width: 100%;
+    height: 1px;
+    background: #edf0f5;
+    margin: 21px 0;
+}
+.qnp-profile-form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.qnp-form-fields {
+    display: grid;
+    gap: 16px;
+}
+.qnp-field {
+    min-width: 0;
+}
+.qnp-label {
+    display: block;
+    font-size: 12px;
+    color: #455c77;
+    font-weight: 650;
+    margin-bottom: 7px;
+}
+.qnp-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #dce4ef;
+    border-radius: 10px;
+    background: #fff;
+    color: #263c5b;
+    font-size: 13px;
+    outline: none;
+    transition: box-shadow .18s,border-color .18s;
+}
+.qnp-input:focus {
+    border-color: #688ed3;
+    box-shadow: 0 0 0 3px rgba(79,123,212,.1);
+}
+.qnp-input[readonly] {
+    background: #f6f8fc;
+    color: #76869b;
+}
+.qnp-form-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 11px;
+    margin-top: auto;
+    padding-top: 24px;
+}
+.qnp-form-actions .qnp-note {
+    margin: 0;
+}
+.qnp-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: transform .15s,background .15s;
+}
+.qnp-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+.qnp-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.qnp-btn-primary {
+    border-color: #345eac;
+    background: linear-gradient(110deg,#3467bb,#435bc1);
+    color: #fff;
+}
+.qnp-btn-secondary {
+    border-color: #dce5f1;
+    background: #fff;
+    color: #4c6685;
+}
+.qnp-btn-danger {
+    border-color: #ebc8ce;
+    background: #fff7f8;
+    color: #b34655;
+}
+.qnp-usage-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.qnp-usage-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border: 1px solid #e1e9f6;
+    border-radius: 30px;
+    background: #f3f7fe;
+    color: #5376a9;
+    font-size: 10px;
+    font-weight: 650;
+}
+.qnp-usage-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.qnp-refresh {
+    border: 1px solid #e1e9f6;
+    background: #fff;
+    border-radius: 9px;
+    padding: 7px 9px;
+    color: #5376a9;
+    font-size: 11px;
+    cursor: pointer;
+}
+.qnp-refresh:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.qnp-period-grid {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 11px;
+    margin-bottom: 19px;
+}
+.qnp-period {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    min-width: 0;
+    padding: 15px;
+    border: 1px solid #e3eaf4;
+    border-radius: 13px;
+    background: #f9fbff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .18s,background .18s;
+}
+.qnp-period:hover {
+    border-color: #afc4ea;
+}
+.qnp-period.active {
+    border-color: #82a4e4;
+    background: #f0f5ff;
+    box-shadow: inset 0 0 0 1px rgba(79,119,193,.08);
+}
+.qnp-period-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    color: #667c98;
+    font-size: 11px;
+    font-weight: 650;
+}
+.qnp-period-top i {
+    color: #7899c2;
+}
+.qnp-period-value {
+    font-size: clamp(23px,2.3vw,31px);
+    font-weight: 750;
+    letter-spacing: -.7px;
+    color: #233c5f;
+    margin-top: 16px;
+    line-height: 1.1;
+}
+.qnp-period-label {
+    color: #8796ab;
+    font-size: 10px;
+    margin-top: 5px;
+}
+.qnp-period-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #526c92;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #e4eaf4;
+}
+.qnp-detail {
+    padding: 18px;
+    border: 1px solid #e4eaf3;
+    border-radius: 13px;
+    background: #fbfcff;
+}
+.qnp-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #415a79;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+.qnp-progress-item+.qnp-progress-item {
+    margin-top: 20px;
+}
+.qnp-progress-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 9px;
+    color: #667a94;
+    font-size: 11px;
+}
+.qnp-progress-top strong {
+    color: #344d6e;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.qnp-progress-top small {
+    font-size: 11px;
+    font-weight: 400;
+    color: #9aa6b6;
+}
+.qnp-average {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid #e6ebf4;
+    margin-top: 20px;
+    padding-top: 15px;
+    color: #71839b;
+    font-size: 11px;
+}
+.qnp-average strong {
+    font-size: 13px;
+    color: #385b88;
+}
+.qnp-provider-heading {
+    font-size: 12px;
+    font-weight: 700;
+    color: #415a79;
+    margin: 20px 0 10px;
+}
+.qnp-provider-grid {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 11px;
+}
+.qnp-provider {
+    padding: 14px;
+    border: 1px solid #e5ebf4;
+    border-radius: 11px;
+    background: #fff;
+}
+.qnp-provider strong {
+    display: block;
+    color: #294465;
+    font-size: 19px;
+    margin: 8px 0 4px;
+}
+.qnp-lower-grid {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    align-items: stretch;
+    gap: 20px;
+    margin-top: 20px;
+}
+.qnp-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 14px 0;
+}
+.qnp-info+.qnp-info {
+    border-top: 1px solid #eef1f6;
+}
+.qnp-info-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #f0f4fb;
+    color: #547bb0;
+}
+.qnp-info h3 {
+    color: #3f5877;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 0 5px;
+}
+.qnp-info p {
+    color: #8593a6;
+    font-size: 11px;
+    line-height: 1.75;
+    margin: 0;
+}
+.qnp-danger-card {
+    border-color: #efdfe2;
+    background: #fffefe;
+}
+.qnp-danger-inner {
+    padding: 17px;
+    border: 1px solid #f1e1e4;
+    border-radius: 12px;
+    background: #fff9fa;
+}
+.qnp-danger-inner strong {
+    display: block;
+    color: #9f4552;
+    font-size: 13px;
+    margin-bottom: 9px;
+}
+.qnp-danger-inner p {
+    color: #886f76;
+    font-size: 12px;
+    line-height: 1.85;
+    margin: 0 0 17px;
+}
+.qnp-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 23px;
+    padding: 0 5px;
+    color: #9aa6b8;
+    font-size: 11px;
+}
+.qnp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: grid;
+    place-items: center;
+    padding: 15px;
+    background: rgba(13,24,42,.64);
+    backdrop-filter: blur(5px);
+}
+.qnp-modal {
+    width: 100%;
+    max-width: 435px;
+    padding: 26px;
+    border: 1px solid #e9ecf3;
+    border-radius: 19px;
+    background: #fff;
+    box-shadow: 0 24px 75px rgba(5,18,37,.24);
+}
+.qnp-modal h2 {
+    color: #23374e;
+    font-size: 19px;
+    font-weight: 750;
+    margin: 0 0 9px;
+}
+.qnp-modal p {
+    color: #7c899d;
+    font-size: 12px;
+    line-height: 1.8;
+}
+.qnp-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 20px;
+}
+@media (max-width:1120px) {
+    .qnp-main-grid {
+        grid-template-columns: 1fr;
+    }
+    .qnp-profile-card {
+        height: auto;
+    }
+    .qnp-form-actions {
+        margin-top: 20px;
+        padding-top: 0;
+    }
+}
+@media (max-width:720px) {
+    .qnp-hero {
+        align-items: flex-start;
+        flex-direction: column;
+        min-height: auto;
+    }
+    .qnp-hero-actions {
+        justify-content: flex-start;
+    }
+    .qnp-lower-grid {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width:480px) {
+    .qnp-hero-user {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .qnp-hero-avatar {
+        width: 72px;
+        height: 72px;
+    }
+    .qnp-period-grid {
+        grid-template-columns: 1fr;
+    }
+    .qnp-period-value {
+        margin-top: 10px;
+    }
+    .qnp-usage-tools {
+        flex-wrap: wrap;
+    }
+}
+
+/* ================== PROFILE COMPONENT STYLES ================== */
+.qnp-usage-title {
+    margin: 0;
+    color: #203653;
+    font-size: 16px;
+    font-weight: 750;
+}
+
+.qnp-usage-footnote {
+    margin-top: 17px;
+}
+
+.qnp-danger-footnote {
+    margin-top: 14px;
+}
+
+.qnp-modal-warning-icon {
+    margin-bottom: 16px;
+}
+
+/* Native progress element: no inline styles needed in JSX. */
+.qnp-progress-meter {
+    display: block;
+    width: 100%;
+    height: 7px;
+    appearance: none;
+    -webkit-appearance: none;
+    overflow: hidden;
+    border: none;
+    border-radius: 20px;
+    background: #e9eef7;
+}
+
+.qnp-progress-meter::-webkit-progress-bar {
+    border-radius: 20px;
+    background: #e9eef7;
+}
+
+.qnp-progress-meter::-webkit-progress-value {
+    border-radius: 20px;
+    background: linear-gradient(90deg, #528dd6, #7768d7);
+}
+
+.qnp-progress-meter::-moz-progress-bar {
+    border-radius: 20px;
+    background: linear-gradient(90deg, #528dd6, #7768d7);
+}
+
+.qnp-progress-meter.qnp-progress-warning::-webkit-progress-value {
+    background: #d78b65;
+}
+
+.qnp-progress-meter.qnp-progress-warning::-moz-progress-bar {
+    background: #d78b65;
+}

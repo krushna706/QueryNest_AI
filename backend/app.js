@@ -2,17 +2,23 @@
 const express = require("express");
 const path = require("node:path");
 const { existsSync } = require("node:fs");
+
 const helmet = require("helmet");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
+// ================== API ROUTES ==================
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const usageRoutes = require("./routes/usageRoutes");
 
+// ================== MIDDLEWARE ==================
 const csrfMiddleware = require("./middleware/csrfMiddleware");
-const ExpressError = require("./utils/ExpressError");
 const errorMiddleware = require("./middleware/errorMiddleware");
+
+const ExpressError = require("./utils/ExpressError");
 
 // ================== APPLICATION SETUP ==================
 const app = express();
@@ -20,10 +26,18 @@ const app = express();
 app.disable("x-powered-by");
 
 // ================== PROXY CONFIGURATION ==================
-const proxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+const proxyHops = Number(
+    process.env.TRUST_PROXY_HOPS || 0
+);
 
-if (!Number.isInteger(proxyHops) || proxyHops < 0 || proxyHops > 10) {
-    throw new Error("TRUST_PROXY_HOPS must be an integer between 0 and 10.");
+if (
+    !Number.isInteger(proxyHops) ||
+    proxyHops < 0 ||
+    proxyHops > 10
+) {
+    throw new Error(
+        "TRUST_PROXY_HOPS must be an integer between 0 and 10."
+    );
 }
 
 if (proxyHops) {
@@ -34,7 +48,9 @@ if (proxyHops) {
 const clientOrigin = process.env.CLIENT_ORIGIN?.trim();
 
 if (!clientOrigin) {
-    throw new Error("CLIENT_ORIGIN is missing in environment configuration.");
+    throw new Error(
+        "CLIENT_ORIGIN is missing in environment configuration."
+    );
 }
 
 const clientUrl = new URL(clientOrigin);
@@ -43,14 +59,18 @@ if (
     !["http:", "https:"].includes(clientUrl.protocol) ||
     clientUrl.origin !== clientOrigin
 ) {
-    throw new Error("CLIENT_ORIGIN must be a valid HTTP/HTTPS origin.");
+    throw new Error(
+        "CLIENT_ORIGIN must be a valid HTTP/HTTPS origin."
+    );
 }
 
 if (
     process.env.NODE_ENV === "production" &&
     clientUrl.protocol !== "https:"
 ) {
-    throw new Error("CLIENT_ORIGIN must use HTTPS in production.");
+    throw new Error(
+        "CLIENT_ORIGIN must use HTTPS in production."
+    );
 }
 
 // ================== SECURITY HEADERS ==================
@@ -64,6 +84,7 @@ app.use(
                     "blob:",
                     "https://res.cloudinary.com",
                 ],
+
                 upgradeInsecureRequests:
                     process.env.NODE_ENV === "production"
                         ? []
@@ -78,6 +99,7 @@ app.use(
     cors({
         origin: clientOrigin,
         credentials: true,
+
         methods: [
             "GET",
             "POST",
@@ -86,15 +108,23 @@ app.use(
             "DELETE",
             "OPTIONS",
         ],
-        allowedHeaders: ["Content-Type"],
-        exposedHeaders: ["Retry-After"],
+
+        allowedHeaders: [
+            "Content-Type",
+        ],
+
+        exposedHeaders: [
+            "Retry-After",
+        ],
     })
 );
 
 // ================== REQUEST BODY PARSING ==================
-app.use(express.json({
-    limit: "100kb",
-}));
+app.use(
+    express.json({
+        limit: "100kb",
+    })
+);
 
 // ================== COOKIE PARSING ==================
 app.use(cookieParser());
@@ -110,10 +140,28 @@ app.get("/api/health", (req, res) => {
     });
 });
 
-// ================== API ROUTES ==================
+// ================== REQUIRED API ROUTES ==================
 app.use("/api/auth", authRoutes);
 app.use("/api/chats", chatRoutes);
-app.use("/api/documents", documentRoutes);
+
+// ================== USER PROFILE ROUTES ==================
+if (typeof userRoutes !== "function") {
+    throw new TypeError(
+        "userRoutes.js must export an Express Router."
+    );
+}
+
+app.use("/api/users", userRoutes);
+
+// ================== DOCUMENT ROUTES ==================
+if (typeof documentRoutes === "function") {
+    app.use("/api/documents", documentRoutes);
+}
+
+// ================== USAGE ROUTES ==================
+if (typeof usageRoutes === "function") {
+    app.use("/api/usage", usageRoutes);
+}
 
 // ================== FRONTEND SERVING ==================
 if (process.env.SERVE_FRONTEND === "true") {
@@ -133,7 +181,7 @@ if (process.env.SERVE_FRONTEND === "true") {
         );
     }
 
-    // ================== STATIC FILES ==================
+    // ================== STATIC FRONTEND FILES ==================
     app.use(
         express.static(frontendPath, {
             index: false,
@@ -151,7 +199,10 @@ if (process.env.SERVE_FRONTEND === "true") {
             return next();
         }
 
-        res.set("Cache-Control", "no-store");
+        res.set(
+            "Cache-Control",
+            "no-store"
+        );
 
         return res.sendFile(indexPath);
     });
@@ -159,7 +210,7 @@ if (process.env.SERVE_FRONTEND === "true") {
 
 // ================== ROUTE NOT FOUND ==================
 app.use((req, res, next) => {
-    next(
+    return next(
         new ExpressError(
             404,
             "Route not found."
@@ -167,7 +218,7 @@ app.use((req, res, next) => {
     );
 });
 
-// ================== ERROR HANDLER ==================
+// ================== GLOBAL ERROR HANDLER ==================
 app.use(errorMiddleware);
 
 // ================== EXPORT ==================

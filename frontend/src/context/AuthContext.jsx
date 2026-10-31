@@ -1,15 +1,30 @@
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
+
 import api from "../services/api";
 
 // ================== AUTH CONTEXT ==================
 const AuthContext = createContext(null);
+
 const SESSION_EVENT = "querynest-ai-session-change";
+
+// ================== DEFAULT AVATAR ==================
+const DEFAULT_AVATAR = "/images/default-avatar.svg";
 
 // ================== SESSION NOTIFICATION ==================
 function notifyOtherTabs() {
     try {
-        localStorage.setItem(SESSION_EVENT, `${Date.now()}-${Math.random()}`);
+        localStorage.setItem(
+            SESSION_EVENT,
+            `${Date.now()}-${Math.random()}`
+        );
     } catch {
         // Session checks still work without localStorage.
     }
@@ -17,7 +32,17 @@ function notifyOtherTabs() {
 
 // ================== USER DATA ==================
 function normalizeAuthUser(user) {
-    return user ? { ...user, avatarUrl: user.avatar?.url || "" } : null;
+    if (!user) return null;
+
+    const uploadedAvatar =
+        user.avatar?.url ||
+        user.avatarUrl ||
+        "";
+
+    return {
+        ...user,
+        avatarUrl: uploadedAvatar || DEFAULT_AVATAR,
+    };
 }
 
 // ================== AUTH PROVIDER ==================
@@ -57,6 +82,7 @@ export function AuthProvider({ children }) {
 
             setUser(normalizeAuthUser(data.user));
             setAuthError("");
+
         } catch (error) {
             if (requestId !== sessionRequestId.current) return;
 
@@ -65,10 +91,14 @@ export function AuthProvider({ children }) {
             if (status === 401 || status === 403) {
                 setUser(null);
                 setAuthError("");
+
             } else if (!silent) {
                 setUser(null);
-                setAuthError("Unable to check your session. Please try again.");
+                setAuthError(
+                    "Unable to check your session. Please try again."
+                );
             }
+
         } finally {
             if (requestId === sessionRequestId.current) {
                 setLoading(false);
@@ -78,10 +108,14 @@ export function AuthProvider({ children }) {
 
     // ================== API INTERCEPTORS ==================
     useEffect(() => {
-        const requestId = api.interceptors.request.use((config) => {
-            config.authRequestId = sessionRequestId.current;
-            return config;
-        });
+        const requestId = api.interceptors.request.use(
+            (config) => {
+                config.authRequestId =
+                    sessionRequestId.current;
+
+                return config;
+            }
+        );
 
         const responseId = api.interceptors.response.use(
             (response) => response,
@@ -91,7 +125,8 @@ export function AuthProvider({ children }) {
                 if (
                     config &&
                     !config.skipSessionHandling &&
-                    config.authRequestId === sessionRequestId.current
+                    config.authRequestId ===
+                        sessionRequestId.current
                 ) {
                     if (error.response?.status === 401) {
                         clearSession();
@@ -148,20 +183,32 @@ export function AuthProvider({ children }) {
 
         window.addEventListener("focus", checkSession);
         window.addEventListener("storage", onStorage);
-        document.addEventListener("visibilitychange", checkSession);
+
+        document.addEventListener(
+            "visibilitychange",
+            checkSession
+        );
 
         return () => {
             window.removeEventListener("focus", checkSession);
             window.removeEventListener("storage", onStorage);
-            document.removeEventListener("visibilitychange", checkSession);
+
+            document.removeEventListener(
+                "visibilitychange",
+                checkSession
+            );
         };
     }, [refreshUser]);
 
     // ================== LOGIN ==================
     const login = useCallback(async (credentials) => {
-        const { data } = await api.post("/auth/login", credentials, {
-            skipSessionHandling: true,
-        });
+        const { data } = await api.post(
+            "/auth/login",
+            credentials,
+            {
+                skipSessionHandling: true,
+            }
+        );
 
         sessionRequestId.current += 1;
 
@@ -176,9 +223,13 @@ export function AuthProvider({ children }) {
 
     // ================== SIGNUP ==================
     const signup = useCallback(async (details) => {
-        const { data } = await api.post("/auth/signup", details, {
-            skipSessionHandling: true,
-        });
+        const { data } = await api.post(
+            "/auth/signup",
+            details,
+            {
+                skipSessionHandling: true,
+            }
+        );
 
         return data;
     }, []);
@@ -188,7 +239,10 @@ export function AuthProvider({ children }) {
         if (!profile?._id) return;
 
         setUser((current) => {
-            if (!current || String(current._id) !== String(profile._id)) {
+            if (
+                !current ||
+                String(current._id) !== String(profile._id)
+            ) {
                 return current;
             }
 
@@ -196,13 +250,18 @@ export function AuthProvider({ children }) {
 
             const changes = Object.fromEntries(
                 fields
-                    .filter((key) => profile[key] !== undefined)
-                    .map((key) => [key, profile[key]])
+                    .filter(
+                        (key) => profile[key] !== undefined
+                    )
+                    .map(
+                        (key) => [key, profile[key]]
+                    )
             );
 
             return normalizeAuthUser({
                 ...current,
                 ...changes,
+                avatarUrl: undefined,
             });
         });
 
@@ -212,9 +271,14 @@ export function AuthProvider({ children }) {
     // ================== LOGOUT ==================
     const logout = useCallback(async () => {
         try {
-            await api.post("/auth/logout", null, {
-                skipSessionHandling: true,
-            });
+            await api.post(
+                "/auth/logout",
+                null,
+                {
+                    skipSessionHandling: true,
+                }
+            );
+
         } catch (error) {
             if (
                 error.response?.status !== 401 &&
@@ -253,7 +317,9 @@ export function useAuth() {
     const context = useContext(AuthContext);
 
     if (!context) {
-        throw new Error("useAuth must be used inside AuthProvider.");
+        throw new Error(
+            "useAuth must be used inside AuthProvider."
+        );
     }
 
     return context;
