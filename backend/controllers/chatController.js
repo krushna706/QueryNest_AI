@@ -1,23 +1,26 @@
 
 const mongoose = require("mongoose");
+const { randomUUID } = require("node:crypto");
 
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const ExpressError = require("../utils/ExpressError");
-const { randomUUID } = require("node:crypto");
 
 const { identifyTask } = require("../services/ai/taskRouter");
 const { buildAIContext } = require("../services/ai/contextBuilder");
 const { streamAIResponse } = require("../services/ai/aiRouter");
 const { scheduleAIRequest } = require("../services/usage/requestScheduler");
+
 const {
+    getCurrentProviderBudgets,
     reserveAIUsage,
     startAIUsage,
     finalizeAIUsage,
     cancelReservedAIUsage,
 } = require("../services/usage/usageService");
-const { createStreamResponse } = require("../utils/streamResponse");
 
+const { createStreamResponse } = require("../utils/streamResponse");
+const { APP_USAGE_LIMITS } = require("../config/usageLimits");
 
 // ================== CONVERSATION RESPONSE ==================
 function getConversationResponse(conversation) {
@@ -247,7 +250,9 @@ async function renameConversation(req, res, next) {
         );
 
         if (!conversation) {
-            return next(new ExpressError(404, "Conversation not found."));
+            return next(
+                new ExpressError(404, "Conversation not found.")
+            );
         }
 
         return res.status(200).json({
@@ -306,7 +311,10 @@ async function addUserMessage(req, res, next) {
                 );
 
                 if (!conversation) {
-                    throw new ExpressError(404, "Conversation not found.");
+                    throw new ExpressError(
+                        404,
+                        "Conversation not found."
+                    );
                 }
 
                 const [createdMessage] = await Message.create(
@@ -377,16 +385,22 @@ async function getMessageHistory(req, res, next) {
                 .lean();
 
             if (!previousMessage) {
-                return next(new ExpressError(400, "Invalid message cursor."));
+                return next(
+                    new ExpressError(400, "Invalid message cursor.")
+                );
             }
 
             filter.$or = [
                 {
-                    createdAt: { $lt: previousMessage.createdAt },
+                    createdAt: {
+                        $lt: previousMessage.createdAt,
+                    },
                 },
                 {
                     createdAt: previousMessage.createdAt,
-                    _id: { $lt: previousMessage._id },
+                    _id: {
+                        $lt: previousMessage._id,
+                    },
                 },
             ];
         }
@@ -445,7 +459,10 @@ async function deleteConversation(req, res, next) {
             );
 
             if (!conversation) {
-                throw new ExpressError(404, "Conversation not found.");
+                throw new ExpressError(
+                    404,
+                    "Conversation not found."
+                );
             }
 
             await Message.deleteMany(
@@ -477,7 +494,6 @@ async function deleteConversation(req, res, next) {
 
 // ================== GENERATE AI RESPONSE ==================
 // POST /api/chats/:conversationId/generate
-// Body: { messageId, regenerate? } — user message must already be saved.
 async function generateAIResponse(req, res, next) {
     try {
         const userId = req.user._id;
@@ -487,7 +503,10 @@ async function generateAIResponse(req, res, next) {
 
         // ================== VALIDATE MESSAGE ID ==================
         if (!mongoose.isValidObjectId(messageId)) {
-            throw new ExpressError(400, "Invalid user message ID.");
+            throw new ExpressError(
+                400,
+                "Invalid user message ID."
+            );
         }
 
         // ================== FETCH SAVED MESSAGE ==================
@@ -500,26 +519,42 @@ async function generateAIResponse(req, res, next) {
         }).lean();
 
         if (!userMessage) {
-            throw new ExpressError(404, "User message not found.");
+            throw new ExpressError(
+                404,
+                "User message not found."
+            );
         }
 
-        // Only generate for the latest user message.
+        // ================== LATEST USER MESSAGE ==================
         const latestUserMessage = await Message.findOne({
             userId,
             conversationId,
             role: "user",
         })
-            .sort({ createdAt: -1, _id: -1 })
+            .sort({
+                createdAt: -1,
+                _id: -1,
+            })
             .select("_id")
             .lean();
 
-        if (String(latestUserMessage?._id) !== String(messageId)) {
-            throw new ExpressError(409, "Generate a reply for the latest message.");
+        if (
+            String(latestUserMessage?._id) !==
+            String(messageId)
+        ) {
+            throw new ExpressError(
+                409,
+                "Generate a reply for the latest message."
+            );
         }
 
-        // Document retrieval is a separate integration phase.
+        // ================== DOCUMENT SUPPORT ==================
+        // Document retrieval will be integrated separately.
         if (userMessage.attachmentIds?.length) {
-            throw new ExpressError(409, "Document processing is not available yet.");
+            throw new ExpressError(
+                409,
+                "Document processing is not available yet."
+            );
         }
 
         // ================== IDENTIFY TASK ==================
@@ -530,10 +565,13 @@ async function generateAIResponse(req, res, next) {
         });
 
         if (taskResult.needsClarification) {
-            throw new ExpressError(422, taskResult.clarification);
+            throw new ExpressError(
+                422,
+                taskResult.clarification
+            );
         }
 
-        // ================== BUILD CONTEXT ==================
+        // ================== BUILD AI CONTEXT ==================
         const context = await buildAIContext({
             userId,
             conversationId,
@@ -543,7 +581,10 @@ async function generateAIResponse(req, res, next) {
             maxInputTokens: 5000,
         });
 
-        const maxOutputTokens = 2048;
+        // ================== CENTRALIZED OUTPUT LIMIT ==================
+        const maxOutputTokens =
+            APP_USAGE_LIMITS.maxOutputTokensPerRequest;
+
         const stream = createStreamResponse(req, res);
 
         // ================== PER-REQUEST STATE ==================
@@ -551,6 +592,7 @@ async function generateAIResponse(req, res, next) {
         let attemptKey = null;
         let attemptUsage = null;
         let usageSettled = false;
+
         let content = "";
         let selectedProvider = null;
         let selectedModel = null;
@@ -579,7 +621,10 @@ async function generateAIResponse(req, res, next) {
             );
 
             if (saved.matchedCount !== 1) {
-                throw new ExpressError(404, "Conversation is no longer available.");
+                throw new ExpressError(
+                    404,
+                    "Conversation is no longer available."
+                );
             }
 
             lastCheckpoint = Date.now();
@@ -587,7 +632,9 @@ async function generateAIResponse(req, res, next) {
 
         // ================== SETTLE CURRENT PROVIDER ==================
         async function settleProvider(status) {
-            if (!attemptKey || usageSettled) return;
+            if (!attemptKey || usageSettled) {
+                return;
+            }
 
             await finalizeAIUsage({
                 attemptKey,
@@ -604,8 +651,7 @@ async function generateAIResponse(req, res, next) {
             estimatedInputTokens,
             maxOutputTokens: outputTokens,
         }) {
-            // A previous provider may have failed before output.
-            // Account for that attempt before starting fallback.
+            // Finalize the previous failed provider before fallback.
             if (attemptKey && !usageSettled) {
                 await settleProvider("failed");
             }
@@ -615,6 +661,7 @@ async function generateAIResponse(req, res, next) {
             usageSettled = false;
 
             const key = randomUUID();
+
             const reservation = await reserveAIUsage({
                 attemptKey: key,
                 userId,
@@ -625,127 +672,183 @@ async function generateAIResponse(req, res, next) {
             });
 
             if (!reservation.allowed) {
-                return { allowed: false };
+                return {
+                    allowed: false,
+                };
             }
 
             try {
-                // Consume one request once upstream dispatch starts.
-                await startAIUsage({ attemptKey: key });
+                await startAIUsage({
+                    attemptKey: key,
+                });
             } catch (error) {
-                await cancelReservedAIUsage({ attemptKey: key });
+                await cancelReservedAIUsage({
+                    attemptKey: key,
+                });
+
                 throw error;
             }
 
             attemptKey = key;
-            return { allowed: true };
+
+            return {
+                allowed: true,
+            };
         }
 
         // ================== GENERATE IN EXECUTION SLOT ==================
         async function executeGeneration() {
-            // ================== RECHECK AFTER QUEUE ==================
-            // The user may have sent another message while waiting.
+
+            // ================== RECHECK LATEST MESSAGE ==================
             const latestSavedUser = await Message.findOne({
                 userId,
                 conversationId,
                 role: "user",
             })
-                .sort({ createdAt: -1, _id: -1 })
+                .sort({
+                    createdAt: -1,
+                    _id: -1,
+                })
                 .select("_id")
                 .lean();
 
-            if (String(latestSavedUser?._id) !== String(messageId)) {
-                throw new ExpressError(409, "Generate a reply for the latest message.");
+            if (
+                String(latestSavedUser?._id) !==
+                String(messageId)
+            ) {
+                throw new ExpressError(
+                    409,
+                    "Generate a reply for the latest message."
+                );
             }
 
             // ================== CREATE RESPONSE ATOMICALLY ==================
-            // Updating the conversation and checking the latest attempt
-            // in one transaction helps serialize competing generations.
-            await mongoose.connection.transaction(async (session) => {
-                const activeConversation = await Conversation.findOneAndUpdate(
-                    {
-                        _id: conversationId,
-                        userId,
-                        status: "active",
-                    },
-                    { $set: { lastActivityAt: new Date() } },
-                    { session, returnDocument: "after" }
-                );
+            await mongoose.connection.transaction(
+                async (session) => {
+                    const activeConversation =
+                        await Conversation.findOneAndUpdate(
+                            {
+                                _id: conversationId,
+                                userId,
+                                status: "active",
+                            },
+                            {
+                                $set: {
+                                    lastActivityAt: new Date(),
+                                },
+                            },
+                            {
+                                session,
+                                returnDocument: "after",
+                            }
+                        );
 
-                if (!activeConversation) {
-                    throw new ExpressError(404, "Conversation not found.");
-                }
-
-                // ================== CHECK PREVIOUS AI ATTEMPT ==================
-                const latestResponse = await Message.findOne({
-                    userId,
-                    conversationId,
-                    role: "assistant",
-                    replyToMessageId: messageId,
-                })
-                    .sort({ attemptNumber: -1, _id: -1 })
-                    .session(session)
-                    .lean();
-
-                // Never start another generation while one is pending.
-                if (["queued", "streaming"].includes(latestResponse?.status)) {
-                    throw new ExpressError(409, "An AI response is already in progress.");
-                }
-
-                if (regenerate) {
-                    // Regenerate only a successfully completed answer.
-                    // Failed, stopped, or incomplete attempts use Retry.
-                    if (latestResponse?.status !== "completed") {
+                    if (!activeConversation) {
                         throw new ExpressError(
-                            409,
-                            "Only a completed AI response can be regenerated. Use Retry for an incomplete response."
+                            404,
+                            "Conversation not found."
                         );
                     }
-                } else if (latestResponse?.status === "completed") {
-                    throw new ExpressError(
-                        409,
-                        "An AI response already exists. Use Regenerate to create a new version."
-                    );
-                }
 
-                // ================== SAVE NEW RESPONSE VERSION ==================
-                const [created] = await Message.create(
-                    [{
+                    // ================== CHECK PREVIOUS ATTEMPT ==================
+                    const latestResponse = await Message.findOne({
                         userId,
                         conversationId,
                         role: "assistant",
                         replyToMessageId: messageId,
-                        attemptNumber: (latestResponse?.attemptNumber || 0) + 1,
-                        content: "",
-                        status: "queued",
-                    }],
-                    { session }
-                );
+                    })
+                        .sort({
+                            attemptNumber: -1,
+                            _id: -1,
+                        })
+                        .session(session)
+                        .lean();
 
-                assistantMessage = created;
-            });
+                    if (
+                        ["queued", "streaming"].includes(
+                            latestResponse?.status
+                        )
+                    ) {
+                        throw new ExpressError(
+                            409,
+                            "An AI response is already in progress."
+                        );
+                    }
+
+                    // ================== REGENERATE RULE ==================
+                    if (regenerate) {
+                        if (
+                            latestResponse?.status !==
+                            "completed"
+                        ) {
+                            throw new ExpressError(
+                                409,
+                                "Only a completed AI response can be regenerated. Use Retry for an incomplete response."
+                            );
+                        }
+                    } else if (
+                        latestResponse?.status === "completed"
+                    ) {
+                        throw new ExpressError(
+                            409,
+                            "An AI response already exists. Use Regenerate to create a new version."
+                        );
+                    }
+
+                    // ================== CREATE RESPONSE VERSION ==================
+                    const [created] = await Message.create(
+                        [{
+                            userId,
+                            conversationId,
+                            role: "assistant",
+                            replyToMessageId: messageId,
+                            attemptNumber:
+                                (latestResponse?.attemptNumber || 0) + 1,
+                            content: "",
+                            status: "queued",
+                        }],
+                        { session }
+                    );
+
+                    assistantMessage = created;
+                }
+            );
 
             try {
+                // ================== START STREAM ==================
                 await stream.send("start", {
                     messageId: String(assistantMessage._id),
                     replyToMessageId: String(messageId),
                 });
 
+                // ================== CURRENT PROVIDER BUDGET ==================
+                // Read quota after the request enters its execution slot.
+                // The reservation transaction remains the final check.
+                const providerBudgets =
+                    await getCurrentProviderBudgets();
+
+                // ================== ROUTE AI REQUEST ==================
                 const events = streamAIResponse({
                     task: taskResult.task,
                     messages: context.messages,
                     systemInstruction: context.systemInstruction,
-                    estimatedInputTokens: context.estimatedInputTokens,
+                    estimatedInputTokens:
+                        context.estimatedInputTokens,
                     maxOutputTokens,
+                    providerBudgets,
                     reserveProvider,
                     signal: stream.signal,
                 });
 
-                // ================== STREAM EVENTS ==================
+                // ================== PROCESS STREAM EVENTS ==================
                 for await (const event of events) {
                     if (stream.signal.aborted) {
-                        throw new Error("Generation stopped.");
+                        throw new Error(
+                            "Generation stopped."
+                        );
                     }
 
+                    // ================== PROVIDER SELECTED ==================
                     if (event.type === "provider") {
                         selectedProvider = event.provider;
                         selectedModel = event.model;
@@ -756,49 +859,81 @@ async function generateAIResponse(req, res, next) {
                             provider: selectedProvider,
                             model: selectedModel,
                         });
+
+                    // ================== RESPONSE DELTA ==================
                     } else if (event.type === "delta") {
-                        if (content.length + event.text.length > 100000) {
-                            throw new ExpressError(413, "AI answer exceeds the message limit.");
+                        if (
+                            content.length + event.text.length >
+                            100000
+                        ) {
+                            throw new ExpressError(
+                                413,
+                                "AI answer exceeds the message limit."
+                            );
                         }
 
                         content += event.text;
 
-                        // Save periodic checkpoints, not a DB write per token.
-                        if (content.length % 1000 < event.text.length ||
-                            Date.now() - lastCheckpoint >= 2000) {
-                            await persistAnswer("streaming");
+                        // Periodic DB checkpoints during streaming.
+                        if (
+                            content.length % 1000 <
+                                event.text.length ||
+                            Date.now() - lastCheckpoint >= 2000
+                        ) {
+                            await persistAnswer(
+                                "streaming"
+                            );
                         }
 
-                        await stream.send("delta", { text: event.text });
+                        await stream.send("delta", {
+                            text: event.text,
+                        });
+
+                    // ================== TOKEN USAGE ==================
                     } else if (event.type === "usage") {
                         attemptUsage = {
                             inputTokens: event.inputTokens,
                             outputTokens: event.outputTokens,
                             totalTokens: event.totalTokens,
                         };
+
+                    // ================== FINISH REASON ==================
                     } else if (event.type === "finish") {
                         finishReason = event.reason;
                     }
                 }
 
-                // A deleted conversation must never receive a late result.
-                const stillActive = await Conversation.exists({
-                    _id: conversationId,
-                    userId,
-                    status: "active",
-                });
+                // ================== CHECK ACTIVE CONVERSATION ==================
+                const stillActive =
+                    await Conversation.exists({
+                        _id: conversationId,
+                        userId,
+                        status: "active",
+                    });
 
                 if (!stillActive) {
-                    throw new ExpressError(404, "Conversation not found.");
+                    throw new ExpressError(
+                        404,
+                        "Conversation not found."
+                    );
                 }
 
-                const completed = Boolean(content.trim()) &&
+                // ================== FINAL RESPONSE STATUS ==================
+                const completed =
+                    Boolean(content.trim()) &&
                     finishReason === "stop";
-                const finalStatus = completed ? "completed" : "incomplete";
 
+                const finalStatus = completed
+                    ? "completed"
+                    : "incomplete";
+
+                // ================== SAVE FINAL RESPONSE ==================
                 await persistAnswer(finalStatus);
+
+                // ================== FINALIZE TOKEN USAGE ==================
                 await settleProvider(finalStatus);
 
+                // ================== FINISH STREAM ==================
                 await stream.send("done", {
                     messageId: String(assistantMessage._id),
                     status: finalStatus,
@@ -806,23 +941,29 @@ async function generateAIResponse(req, res, next) {
                     model: selectedModel,
                     finishReason,
                 });
+
             } catch (error) {
+                // ================== FAILED OR STOPPED RESPONSE ==================
                 const cancelled = stream.signal.aborted;
+
                 const status = cancelled
                     ? "stopped"
-                    : content.length ? "incomplete" : "failed";
+                    : content.length
+                        ? "incomplete"
+                        : "failed";
 
-                // Preserve partial answers, but never recreate deleted records.
+                // Preserve partial content if the record still exists.
                 try {
                     await persistAnswer(status);
                 } catch {
-                    // Conversation may already have been deleted.
+                    // Conversation may have been deleted.
                 }
 
+                // Reconcile quota even when generation fails.
                 try {
                     await settleProvider(status);
                 } catch {
-                    // Leave unreconciled attempts for usage recovery.
+                    // Failed settlements require recovery handling.
                 }
 
                 throw error;
@@ -834,19 +975,27 @@ async function generateAIResponse(req, res, next) {
             await scheduleAIRequest({
                 userId,
                 signal: stream.signal,
+
                 onQueued: ({ position }) => {
-                    stream.send("queued", { position }).catch(() => {});
+                    stream.send("queued", {
+                        position,
+                    }).catch(() => {});
                 },
+
                 execute: executeGeneration,
             });
         } catch (error) {
+            // ================== SEND SAFE ERROR ==================
             if (!stream.isClosed()) {
-                const safeMessage = error instanceof ExpressError
-                    ? error.message
-                    : "AI generation failed. Please try again.";
+                const safeMessage =
+                    error instanceof ExpressError
+                        ? error.message
+                        : "AI generation failed. Please try again.";
 
                 try {
-                    await stream.send("error", { message: safeMessage });
+                    await stream.send("error", {
+                        message: safeMessage,
+                    });
                 } catch {
                     // Client may already be disconnected.
                 }
@@ -854,6 +1003,7 @@ async function generateAIResponse(req, res, next) {
         } finally {
             stream.end();
         }
+
     } catch (error) {
         return next(error);
     }

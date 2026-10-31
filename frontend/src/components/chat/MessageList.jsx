@@ -1,5 +1,5 @@
 
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -284,6 +284,10 @@ const markdownComponents = {
 // ================== MESSAGE ITEM ==================
 const MessageItem = memo(function MessageItem({
     item,
+    versionIndex,
+    versionCount,
+    onPrevious,
+    onNext,
 }) {
     // ================== MESSAGE DETAILS ==================
     const isAssistant = item.role === "assistant";
@@ -398,9 +402,160 @@ const MessageItem = memo(function MessageItem({
                         {statusMessage}
                     </span>
                 )}
+
+            {/* ================== RESPONSE VERSION NAVIGATION ================== */}
+            {isAssistant && versionCount > 1 && (
+                <div
+                    className="chat-response-versions"
+                    role="group"
+                    aria-label="AI response versions"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        gap: "9px",
+                        padding: "5px 4px 0",
+                    }}
+                >
+                    {/* ================== PREVIOUS VERSION ================== */}
+                    <button
+                        type="button"
+                        onClick={onPrevious}
+                        disabled={versionIndex === 0}
+                        aria-label="Previous AI response version"
+                        title="Previous response"
+                        style={{
+                            display: "grid",
+                            placeItems: "center",
+                            width: "29px",
+                            height: "29px",
+                            border: "1px solid #dce5f0",
+                            borderRadius: "8px",
+                            background: "#ffffff",
+                            color: "#49688e",
+                            cursor: versionIndex === 0
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity: versionIndex === 0
+                                ? 0.4
+                                : 1,
+                        }}
+                    >
+                        <i
+                            className="fa-solid fa-chevron-left"
+                            aria-hidden="true"
+                        />
+                    </button>
+
+                    {/* ================== VERSION COUNT ================== */}
+                    <span
+                        aria-live="polite"
+                        style={{
+                            minWidth: "43px",
+                            color: "#5e7594",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            textAlign: "center",
+                            fontVariantNumeric: "tabular-nums",
+                        }}
+                    >
+                        {versionIndex + 1} / {versionCount}
+                    </span>
+
+                    {/* ================== NEXT VERSION ================== */}
+                    <button
+                        type="button"
+                        onClick={onNext}
+                        disabled={versionIndex === versionCount - 1}
+                        aria-label="Next AI response version"
+                        title="Next response"
+                        style={{
+                            display: "grid",
+                            placeItems: "center",
+                            width: "29px",
+                            height: "29px",
+                            border: "1px solid #dce5f0",
+                            borderRadius: "8px",
+                            background: "#ffffff",
+                            color: "#49688e",
+                            cursor: versionIndex === versionCount - 1
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity: versionIndex === versionCount - 1
+                                ? 0.4
+                                : 1,
+                        }}
+                    >
+                        <i
+                            className="fa-solid fa-chevron-right"
+                            aria-hidden="true"
+                        />
+                    </button>
+                </div>
+            )}
         </article>
     );
 });
+
+// ================== GROUP RESPONSE VERSIONS ==================
+function groupMessageVersions(messages) {
+    const versionsByReply = new Map();
+
+    // ================== COLLECT AI ATTEMPTS ==================
+    for (const item of messages) {
+        if (
+            item.role !== "assistant" ||
+            !item.replyToMessageId
+        ) {
+            continue;
+        }
+
+        const replyId = String(item.replyToMessageId);
+
+        if (!versionsByReply.has(replyId)) {
+            versionsByReply.set(replyId, []);
+        }
+
+        versionsByReply.get(replyId).push(item);
+    }
+
+    // ================== BUILD DISPLAY ITEMS ==================
+    const renderedReplies = new Set();
+    const displayItems = [];
+
+    for (const item of messages) {
+        if (
+            item.role === "assistant" &&
+            item.replyToMessageId
+        ) {
+            const replyId = String(item.replyToMessageId);
+
+            if (renderedReplies.has(replyId)) {
+                continue;
+            }
+
+            renderedReplies.add(replyId);
+
+            displayItems.push({
+                key: `reply-${replyId}`,
+                replyId,
+                versions: versionsByReply.get(replyId),
+            });
+
+            continue;
+        }
+
+        // User messages and standalone assistant messages
+        // remain visible in their original order.
+        displayItems.push({
+            key: `message-${item._id}`,
+            replyId: null,
+            versions: [item],
+        });
+    }
+
+    return displayItems;
+}
 
 // ================== MESSAGE LIST ==================
 function MessageList({
@@ -409,6 +564,34 @@ function MessageList({
     loadingMore = false,
     onLoadMore,
 }) {
+    // ================== SELECTED VERSIONS ==================
+    const [selectedVersions, setSelectedVersions] = useState({});
+
+    // ================== GROUP MESSAGES ==================
+    const displayItems = useMemo(
+        () => groupMessageVersions(messages),
+        [messages]
+    );
+
+    // ================== SELECT RESPONSE VERSION ==================
+    function selectVersion(replyId, versions, index) {
+        if (
+            !replyId ||
+            index < 0 ||
+            index >= versions.length
+        ) {
+            return;
+        }
+
+        setSelectedVersions((current) => ({
+            ...current,
+            [replyId]: {
+                messageId: versions[index]._id,
+                versionCount: versions.length,
+            },
+        }));
+    }
+
     return (
         <div className="conversation-message-list">
 
@@ -445,12 +628,51 @@ function MessageList({
             )}
 
             {/* ================== RENDER MESSAGES ================== */}
-            {messages.map((item) => (
-                <MessageItem
-                    key={item._id}
-                    item={item}
-                />
-            ))}
+            {displayItems.map((group) => {
+                const { replyId, versions } = group;
+
+                // ================== SELECT LATEST BY DEFAULT ==================
+                const savedSelection = replyId
+                    ? selectedVersions[replyId]
+                    : null;
+
+                const savedIndex =
+                    savedSelection?.versionCount === versions.length
+                        ? versions.findIndex(
+                            (item) =>
+                                item._id === savedSelection.messageId
+                        )
+                        : -1;
+
+                const versionIndex = savedIndex >= 0
+                    ? savedIndex
+                    : versions.length - 1;
+
+                const currentMessage = versions[versionIndex];
+
+                return (
+                    <MessageItem
+                        key={group.key}
+                        item={currentMessage}
+                        versionIndex={versionIndex}
+                        versionCount={versions.length}
+                        onPrevious={() =>
+                            selectVersion(
+                                replyId,
+                                versions,
+                                versionIndex - 1
+                            )
+                        }
+                        onNext={() =>
+                            selectVersion(
+                                replyId,
+                                versions,
+                                versionIndex + 1
+                            )
+                        }
+                    />
+                );
+            })}
         </div>
     );
 }

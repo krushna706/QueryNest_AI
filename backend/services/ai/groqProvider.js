@@ -1,114 +1,136 @@
 
-const Groq = require("groq-sdk").default;
+const Groq = require("groq-sdk");
 
-const {
-    getAIProviderConfig,
-} = require("../../config/aiProviders");
+const { getAIProviderConfig } = require("../../config/aiProviders");
+const { APP_USAGE_LIMITS } = require("../../config/usageLimits");
 
-// ================== GROQ CLIENT ==================
-let groqClient = null;
-
-function getGroqClient(apiKey) {
-    if (!groqClient) {
-        groqClient = new Groq({
-            apiKey,
-            maxRetries: 0,
-        });
-    }
-
-    return groqClient;
-}
-
-// ================== VALIDATE MESSAGES ==================
-function validateMessages(messages) {
+// ================== PREPARE GROQ MESSAGES ==================
+function prepareGroqMessages(messages, systemInstruction) {
     if (!Array.isArray(messages) || messages.length === 0) {
         throw new Error("AI messages are required.");
     }
 
+    const prepared = [];
+
+    if (typeof systemInstruction === "string" && systemInstruction.trim()) {
+        prepared.push({
+            role: "system",
+            content: systemInstruction.trim(),
+        });
+    }
+
     for (const message of messages) {
         if (
-            !["user", "assistant"].includes(message.role) ||
-            typeof message.content !== "string" ||
+            !["system", "user", "assistant"].includes(message?.role) ||
+            typeof message?.content !== "string" ||
             !message.content.trim()
         ) {
-            throw new Error("Invalid AI message format.");
+            throw new Error("Invalid Groq message format.");
         }
+
+        prepared.push({
+            role: message.role,
+            content: message.content,
+        });
     }
+
+    return prepared;
 }
 
-// ================== GROQ STREAM ==================
+// ================== NORMALIZE TOKEN USAGE ==================
+function normalizeGroqUsage(usage) {
+    if (!usage || typeof usage !== "object") return null;
+
+    const inputTokens = usage.prompt_tokens ?? usage.input_tokens;
+    const outputTokens = usage.completion_tokens ?? usage.output_tokens;
+
+    const totalTokens = usage.total_tokens ??
+        (Number.isSafeInteger(inputTokens) && Number.isSafeInteger(outputTokens)
+            ? inputTokens + outputTokens
+            : null);
+
+    if (
+        !Number.isSafeInteger(inputTokens) || inputTokens < 0 ||
+        !Number.isSafeInteger(outputTokens) || outputTokens < 0 ||
+        !Number.isSafeInteger(totalTokens) || totalTokens < 0
+    ) {
+        return null;
+    }
+
+    return {
+        type: "usage",
+        inputTokens,
+        outputTokens,
+        totalTokens,
+    };
+}
+
+// ================== STREAM GROQ RESPONSE ==================
 async function* streamGroqResponse({
     messages,
     systemInstruction = "",
-    maxOutputTokens = 2048,
+    maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     signal,
 } = {}) {
-    validateMessages(messages);
 
+    // ================== VALIDATE OUTPUT LIMIT ==================
     if (
-        typeof systemInstruction !== "string" ||
-        !Number.isInteger(maxOutputTokens) ||
-        maxOutputTokens < 1
+        !Number.isSafeInteger(maxOutputTokens) ||
+        maxOutputTokens < 1 ||
+        maxOutputTokens > APP_USAGE_LIMITS.maxOutputTokensPerRequest
     ) {
-        throw new Error("Invalid AI generation options.");
+        throw new Error("Invalid Groq output token limit.");
     }
 
     if (signal?.aborted) {
-        throw new Error("AI request cancelled.");
+        throw new Error("Generation stopped.");
     }
 
-    // ================== PROVIDER CONFIGURATION ==================
+    // ================== PREPARE REQUEST ==================
+    const preparedMessages = prepareGroqMessages(
+        messages,
+        systemInstruction
+    );
+
     const { apiKey, model } = getAIProviderConfig("groq");
-    const client = getGroqClient(apiKey);
 
-    // ================== PREPARE MESSAGES ==================
-    const chatMessages = [
-        ...(systemInstruction.trim()
-            ? [{
-                role: "system",
-                content: systemInstruction.trim(),
-            }]
-            : []),
+    // ================== INITIALIZE GROQ ==================
+    const client = new Groq({
+        apiKey,
+        maxRetries: 0,
+        timeout: 60000,
+    });
 
-        ...messages.map((message) => ({
-            role: message.role,
-            content: message.content,
-        })),
-    ];
-
-    // ================== GENERATE RESPONSE ==================
-    const stream = await client.chat.completions.create(
+    // ================== CREATE STREAM ==================
+    const completion = await client.chat.completions.create(
         {
             model,
-            messages: chatMessages,
-            max_completion_tokens: maxOutputTokens,
+            messages: preparedMessages,
             stream: true,
             stream_options: {
                 include_usage: true,
             },
+            max_completion_tokens: maxOutputTokens,
         },
-        {
-            signal,
-        }
+        { signal }
     );
 
-    let finishReason = null;
-    let usageReported = false;
+    let finishReason = "unknown";
 
     // ================== PROCESS STREAM ==================
-    for await (const chunk of stream) {
+    for await (const chunk of completion) {
         if (signal?.aborted) {
-            throw new Error("AI request cancelled.");
+            throw new Error("Generation stopped.");
         }
 
-        const choice = chunk.choices?.[0];
-        const content = choice?.delta?.content;
+        const choice = chunk?.choices?.[0];
+        const text = choice?.delta?.content;
 
         // ================== RESPONSE TEXT ==================
-        if (typeof content === "string" && content.length > 0) {
+        if (typeof text === "string" && text.length > 0) {
             yield {
                 type: "delta",
-                text: content,
+                text,
             };
         }
 
@@ -118,28 +140,27 @@ async function* streamGroqResponse({
         }
 
         // ================== TOKEN USAGE ==================
-        const usage = chunk.x_groq?.usage || chunk.usage;
+        const usageEvent = normalizeGroqUsage(
+            chunk?.usage ?? chunk?.x_groq?.usage
+        );
 
-        if (usage && !usageReported) {
-            usageReported = true;
-
-            yield {
-                type: "usage",
-                inputTokens: usage.prompt_tokens ?? null,
-                outputTokens: usage.completion_tokens ?? null,
-                totalTokens: usage.total_tokens ?? null,
-            };
+        if (usageEvent) {
+            yield usageEvent;
         }
     }
 
-    // ================== STREAM COMPLETE ==================
+    // ================== STREAM COMPLETED ==================
+    if (signal?.aborted) {
+        throw new Error("Generation stopped.");
+    }
+
     yield {
         type: "finish",
-        reason: finishReason || "unknown",
+        reason: finishReason,
     };
 }
 
-// ================== EXPORT ==================
+// ================== EXPORTS ==================
 module.exports = {
     streamGroqResponse,
 };

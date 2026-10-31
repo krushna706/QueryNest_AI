@@ -3,6 +3,7 @@
 // Baseline limits from the October 2026 provider dashboards.
 // Actual limits may change. Recheck before deployment.
 const PROVIDER_USAGE_LIMITS = {
+
     // ================== GROQ LIMITS ==================
     groq: {
         requestsPerMinute: 30,
@@ -24,12 +25,18 @@ const PROVIDER_USAGE_LIMITS = {
 };
 
 // ================== APPLICATION USAGE LIMITS ==================
-// Initial application limits. Tune after testing with three users.
 const APP_USAGE_LIMITS = {
+
     // ================== USER CHAT LIMITS ==================
     requestsPerUserPerMinute: 5,
-    requestsPerUserPerDay: 50,
-    tokensPerUserPerDay: 50000,
+    requestsPerUserPerDay: 100,
+
+    // No fixed daily token cap per registered user.
+    // Shared provider quotas are still enforced.
+    tokensPerUserPerDay: null,
+
+    // ================== AI RESPONSE LIMITS ==================
+    maxOutputTokensPerRequest: 4096,
 
     // ================== CONCURRENCY LIMITS ==================
     maxActiveGenerationsPerUser: 1,
@@ -42,7 +49,6 @@ const APP_USAGE_LIMITS = {
 };
 
 // ================== GET PROVIDER LIMITS ==================
-// Return usage limits for the selected AI provider.
 function getProviderUsageLimits(provider) {
     const limits = PROVIDER_USAGE_LIMITS[provider];
 

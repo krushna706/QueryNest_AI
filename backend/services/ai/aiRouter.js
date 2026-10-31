@@ -5,6 +5,7 @@ const {
 } = require("../../config/aiProviders");
 
 const {
+    APP_USAGE_LIMITS,
     getProviderUsageLimits,
 } = require("../../config/usageLimits");
 
@@ -12,50 +13,117 @@ const { TASK_TYPES } = require("./taskRouter");
 const { streamGroqResponse } = require("./groqProvider");
 const { streamGeminiResponse } = require("./geminiProvider");
 
-// ================== PROVIDER STREAMS ==================
-const PROVIDER_STREAMS = {
-    groq: streamGroqResponse,
-    gemini: streamGeminiResponse,
-};
+// ================== ROUTING CONFIGURATION ==================
+const MIN_OUTPUT_TOKENS = 256;
+const LONG_CONTEXT_THRESHOLD = 4000;
 
-// ================== LONG CONTEXT TASKS ==================
-const LONG_CONTEXT_TASKS = new Set([
-    TASK_TYPES.RESUME_ANALYSIS,
-    TASK_TYPES.COMPARISON,
-]);
-
-// ================== VALIDATE ROUTING OPTIONS ==================
+// ================== VALIDATE REQUEST ==================
 function validateRoutingOptions({
     task,
     estimatedInputTokens,
     maxOutputTokens,
     providerBudgets,
 }) {
-    if (!Object.values(TASK_TYPES).includes(task)) {
-        throw new Error("Invalid AI task type.");
+    if (typeof task !== "string" || !task.trim()) {
+        throw new Error("Invalid AI task.");
     }
 
-    if (
-        !Number.isInteger(estimatedInputTokens) ||
-        estimatedInputTokens < 1
-    ) {
+    if (!Number.isSafeInteger(estimatedInputTokens) || estimatedInputTokens < 1) {
         throw new Error("Invalid estimated input tokens.");
     }
 
     if (
-        !Number.isInteger(maxOutputTokens) ||
-        maxOutputTokens < 1
+        !Number.isSafeInteger(maxOutputTokens) ||
+        maxOutputTokens < 1 ||
+        maxOutputTokens > APP_USAGE_LIMITS.maxOutputTokensPerRequest
     ) {
-        throw new Error("Invalid output token limit.");
+        throw new Error("Invalid AI output token limit.");
     }
 
     if (
-        !providerBudgets ||
+        providerBudgets === null ||
         typeof providerBudgets !== "object" ||
         Array.isArray(providerBudgets)
     ) {
         throw new Error("Invalid provider budgets.");
     }
+}
+
+// ================== AVAILABLE COUNTER ==================
+function remainingBudget(budget, key) {
+    const value = budget?.[key];
+
+    return Number.isFinite(value) && value >= 0
+        ? value
+        : null;
+}
+
+// ================== PROVIDER OUTPUT CAPACITY ==================
+function getProviderOutputCapacity(
+    provider,
+    estimatedInputTokens,
+    maxOutputTokens,
+    providerBudget = {}
+) {
+    const limits = getProviderUsageLimits(provider);
+
+    if (providerBudget?.available === false) return 0;
+
+    for (const key of [
+        "remainingRequestsPerMinute",
+        "remainingRequestsPerDay",
+    ]) {
+        const remaining = remainingBudget(providerBudget, key);
+
+        if (remaining !== null && remaining < 1) {
+            return 0;
+        }
+    }
+
+    // Gemini has a separate input TPM quota.
+    if (
+        limits.inputTokensPerMinute != null &&
+        estimatedInputTokens > limits.inputTokensPerMinute
+    ) {
+        return 0;
+    }
+
+    const remainingInputTPM = remainingBudget(
+        providerBudget,
+        "remainingInputTokensPerMinute"
+    );
+
+    if (
+        remainingInputTPM !== null &&
+        estimatedInputTokens > remainingInputTPM
+    ) {
+        return 0;
+    }
+
+    let outputCapacity = maxOutputTokens;
+
+    // Groq TPM and daily token limits cover input + output.
+    for (const limit of [
+        limits.tokensPerMinute,
+        limits.tokensPerDay,
+        remainingBudget(
+            providerBudget,
+            "remainingTokensPerMinute"
+        ),
+        remainingBudget(
+            providerBudget,
+            "remainingTokensPerDay"
+        ),
+    ]) {
+        if (limit != null) {
+            outputCapacity = Math.min(
+                outputCapacity,
+                limit - estimatedInputTokens
+            );
+        }
+    }
+
+    return Math.max(0, Math.floor(outputCapacity));
 }
 
 // ================== PROVIDER ELIGIBILITY ==================
@@ -65,92 +133,19 @@ function isProviderEligible(
     maxOutputTokens,
     providerBudget = {}
 ) {
-    const config = AI_PROVIDERS[provider];
-
-    if (!config) return false;
-
-    // ================== API KEY ==================
-    if (!process.env[config.apiKeyEnv]?.trim()) {
-        return false;
-    }
-
-    // ================== PROVIDER STATUS ==================
-    if (
-        providerBudget.available === false ||
-        providerBudget.disabled === true
-    ) {
-        return false;
-    }
-
-    const limits = getProviderUsageLimits(provider);
-
-    // ================== REQUEST TOKEN LIMIT ==================
-    if (
-        Number.isFinite(limits.tokensPerMinute) &&
-        estimatedInputTokens + maxOutputTokens >
-            limits.tokensPerMinute
-    ) {
-        return false;
-    }
-
-    if (
-        Number.isFinite(limits.inputTokensPerMinute) &&
-        estimatedInputTokens > limits.inputTokensPerMinute
-    ) {
-        return false;
-    }
-
-    // ================== REMAINING REQUESTS ==================
-    if (
-        Number.isFinite(providerBudget.remainingRequestsPerMinute) &&
-        providerBudget.remainingRequestsPerMinute < 1
-    ) {
-        return false;
-    }
-
-    if (
-        Number.isFinite(providerBudget.remainingRequestsPerDay) &&
-        providerBudget.remainingRequestsPerDay < 1
-    ) {
-        return false;
-    }
-
-    // ================== REMAINING TOKENS ==================
-    const estimatedTotalTokens =
-        estimatedInputTokens + maxOutputTokens;
-
-    if (
-        Number.isFinite(providerBudget.remainingTokensPerMinute) &&
-        estimatedTotalTokens >
-            providerBudget.remainingTokensPerMinute
-    ) {
-        return false;
-    }
-
-    if (
-        Number.isFinite(providerBudget.remainingInputTokensPerMinute) &&
-        estimatedInputTokens >
-            providerBudget.remainingInputTokensPerMinute
-    ) {
-        return false;
-    }
-
-    if (
-        Number.isFinite(providerBudget.remainingTokensPerDay) &&
-        estimatedTotalTokens >
-            providerBudget.remainingTokensPerDay
-    ) {
-        return false;
-    }
-
-    return true;
+    return getProviderOutputCapacity(
+        provider,
+        estimatedInputTokens,
+        maxOutputTokens,
+        providerBudget
+    ) >= MIN_OUTPUT_TOKENS;
 }
 
-// ================== SELECT PROVIDER ORDER ==================
+// ================== SELECT PROVIDERS ==================
 function selectAIProviders({
-    task = TASK_TYPES.GENERAL_CHAT,
+    task,
     estimatedInputTokens,
-    maxOutputTokens = 2048,
+    maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     requiresFullDocument = false,
     providerBudgets = {},
 } = {}) {
@@ -161,101 +156,81 @@ function selectAIProviders({
         providerBudgets,
     });
 
-    // ================== PREFERRED PROVIDER ==================
-    const groqLimits = getProviderUsageLimits("groq");
-
-    const exceedsGroqBudget =
-        estimatedInputTokens + maxOutputTokens >
-        groqLimits.tokensPerMinute;
-
-    const preferGemini =
-        LONG_CONTEXT_TASKS.has(task) ||
+    const prefersGemini =
         requiresFullDocument ||
-        exceedsGroqBudget;
+        estimatedInputTokens > LONG_CONTEXT_THRESHOLD ||
+        [
+            TASK_TYPES.SUMMARY,
+            TASK_TYPES.COMPARISON,
+            TASK_TYPES.RESUME_ANALYSIS,
+            TASK_TYPES.DOCUMENT_IMPROVEMENT,
+        ].includes(task);
 
-    const preferredProvider = preferGemini
+    const alternateProvider = DEFAULT_AI_PROVIDER === "groq"
         ? "gemini"
-        : DEFAULT_AI_PROVIDER;
+        : "groq";
 
-    // ================== FALLBACK ORDER ==================
-    const providerOrder = [
-        preferredProvider,
-        ...Object.keys(PROVIDER_STREAMS).filter(
-            (provider) => provider !== preferredProvider
-        ),
-    ];
+    const priority = prefersGemini
+        ? ["gemini", "groq"]
+        : [DEFAULT_AI_PROVIDER, alternateProvider];
 
-    // ================== FILTER ELIGIBLE PROVIDERS ==================
-    return providerOrder.filter((provider) =>
-        isProviderEligible(
-            provider,
-            estimatedInputTokens,
-            maxOutputTokens,
-            providerBudgets[provider]
-        )
+    return [...new Set(priority)].filter(
+        (provider) =>
+            Boolean(AI_PROVIDERS[provider]) &&
+            isProviderEligible(
+                provider,
+                estimatedInputTokens,
+                maxOutputTokens,
+                providerBudgets[provider]
+            )
     );
 }
 
-// ================== RETRYABLE PROVIDER ERROR ==================
+// ================== RETRYABLE PROVIDER ERRORS ==================
 function isRetryableProviderError(error) {
     const status = Number(
         error?.status ??
         error?.statusCode ??
-        error?.response?.status
+        error?.response?.status ??
+        error?.code
     );
 
-    const code = String(
-        error?.code ||
-        error?.cause?.code ||
-        ""
-    ).toUpperCase();
-
-    const retryableStatuses = [
-        408,
-        429,
-        500,
-        502,
-        503,
-        504,
-    ];
-
-    const retryableCodes = [
-        "ETIMEDOUT",
-        "ECONNRESET",
-        "EAI_AGAIN",
-        "UND_ERR_CONNECT_TIMEOUT",
-        "RESOURCE_EXHAUSTED",
-        "UNAVAILABLE",
-    ];
+    const code = String(error?.code || "").toUpperCase();
 
     return (
-        retryableStatuses.includes(status) ||
-        retryableCodes.includes(code)
+        status === 408 ||
+        status === 429 ||
+        (status >= 500 && status < 600) ||
+        [
+            "ECONNRESET",
+            "ETIMEDOUT",
+            "ECONNREFUSED",
+            "EAI_AGAIN",
+            "UND_ERR_CONNECT_TIMEOUT",
+        ].includes(code)
     );
 }
 
 // ================== STREAM AI RESPONSE ==================
 async function* streamAIResponse({
-    task = TASK_TYPES.GENERAL_CHAT,
+    task,
     messages,
     systemInstruction = "",
     estimatedInputTokens,
-    maxOutputTokens = 2048,
+    maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     requiresFullDocument = false,
     providerBudgets = {},
     reserveProvider,
     signal,
 } = {}) {
-    // ================== VALIDATE REQUEST ==================
-    if (!Array.isArray(messages) || messages.length === 0) {
+    if (!Array.isArray(messages) || !messages.length) {
         throw new Error("AI messages are required.");
     }
 
     if (typeof reserveProvider !== "function") {
-        throw new Error("AI capacity reservation is required.");
+        throw new Error("AI quota reservation is required.");
     }
 
-    // ================== GET PROVIDER ORDER ==================
     const providers = selectAIProviders({
         task,
         estimatedInputTokens,
@@ -264,136 +239,91 @@ async function* streamAIResponse({
         providerBudgets,
     });
 
-    if (!providers.length) {
-        throw new Error(
-            "No AI provider is currently eligible for this request."
-        );
-    }
+    let lastProviderError = null;
 
-    let lastError = null;
-
-    // ================== PROVIDER ATTEMPTS ==================
     for (const provider of providers) {
         if (signal?.aborted) {
-            throw new Error("AI request cancelled.");
+            throw new Error("Generation stopped.");
         }
 
-        // Reserve capacity before starting each provider request.
-        const reservation = await reserveProvider({
+        const providerMaxOutputTokens = getProviderOutputCapacity(
             provider,
             estimatedInputTokens,
             maxOutputTokens,
+            providerBudgets[provider]
+        );
+
+        // The reservation handles real-time counters and concurrent users.
+        const reservation = await reserveProvider({
+            provider,
+            estimatedInputTokens,
+            maxOutputTokens: providerMaxOutputTokens,
         });
 
         if (!reservation?.allowed) {
             continue;
         }
 
-        const streamProvider = PROVIDER_STREAMS[provider];
-        const model = AI_PROVIDERS[provider].model;
-
-        let hasStartedResponse = false;
-        let providerAnnounced = false;
-        let finishReason = "unknown";
+        let hasVisibleOutput = false;
 
         try {
-            // ================== START PROVIDER STREAM ==================
-            const stream = streamProvider({
-                messages,
-                systemInstruction,
-                maxOutputTokens,
-                signal,
-            });
-
-            for await (const event of stream) {
-                if (signal?.aborted) {
-                    throw new Error("AI request cancelled.");
-                }
-
-                // ================== TEXT CHUNKS ==================
-                if (
-                    event.type === "delta" &&
-                    typeof event.text === "string" &&
-                    event.text.length > 0
-                ) {
-                    if (!providerAnnounced) {
-                        providerAnnounced = true;
-
-                        yield {
-                            type: "provider",
-                            provider,
-                            model,
-                        };
-                    }
-
-                    hasStartedResponse = true;
-
-                    yield {
-                        type: "delta",
-                        text: event.text,
-                    };
-                }
-
-                // ================== TOKEN USAGE ==================
-                else if (event.type === "usage") {
-                    yield {
-                        ...event,
-                        provider,
-                        model,
-                    };
-                }
-
-                // ================== FINISH REASON ==================
-                else if (event.type === "finish") {
-                    finishReason = event.reason || "unknown";
-                }
-            }
-
-            // ================== RESPONSE COMPLETE ==================
-            if (!providerAnnounced) {
-                yield {
-                    type: "provider",
-                    provider,
-                    model,
-                };
-            }
+            const providerStream = provider === "groq"
+                ? streamGroqResponse({
+                    messages,
+                    systemInstruction,
+                    maxOutputTokens: providerMaxOutputTokens,
+                    signal,
+                })
+                : streamGeminiResponse({
+                    messages,
+                    systemInstruction,
+                    maxOutputTokens: providerMaxOutputTokens,
+                    signal,
+                });
 
             yield {
-                type: "finish",
+                type: "provider",
                 provider,
-                model,
-                reason: finishReason,
+                model: AI_PROVIDERS[provider].model,
             };
+
+            for await (const event of providerStream) {
+                if (signal?.aborted) {
+                    throw new Error("Generation stopped.");
+                }
+
+                if (event.type === "delta" && event.text) {
+                    hasVisibleOutput = true;
+                }
+
+                yield event;
+            }
 
             return;
         } catch (error) {
-            lastError = error;
-
-            // Never fallback after visible response content.
+            // Never switch models after any response text reaches the user.
             if (
                 signal?.aborted ||
-                hasStartedResponse ||
+                hasVisibleOutput ||
                 !isRetryableProviderError(error)
             ) {
                 throw error;
             }
 
-            // Retryable failure before response:
-            // try the next eligible provider, if any.
+            lastProviderError = error;
         }
     }
 
-    // ================== PROVIDERS UNAVAILABLE ==================
-    if (lastError) {
-        throw lastError;
+    if (lastProviderError) {
+        throw lastProviderError;
     }
 
     throw new Error(
-        "AI providers are temporarily unavailable. Please try again later."
+        "No AI provider has sufficient quota for this request."
     );
 }
 
-// ================== EXPORT ==================
+// ================== EXPORTS ==================
 module.exports = {
     selectAIProviders,
     streamAIResponse,
