@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAuth } from "../context/AuthContext";
@@ -61,6 +61,31 @@ function getErrorMessage(error, fallback) {
 function ChatDashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { requireAuth } = useOutletContext() || {};
+    const isGuest = !user;
+
+    // ================== GUEST AUTHENTICATION ==================
+    const requestSignIn = () => {
+        if (!isGuest) return false;
+
+        if (typeof requireAuth === "function") {
+            requireAuth();
+        } else {
+            navigate("/login");
+        }
+
+        return true;
+    };
+
+    // ================== GUEST COMPOSER INTERACTIONS ==================
+    const handleComposerClickCapture = (event) => {
+        if (!isGuest) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        requestSignIn();
+    };
+
 
     // ================== COMPOSER STATE ==================
     const [message, setMessage] = useState("");
@@ -87,7 +112,7 @@ function ChatDashboard() {
 
     // ================== MESSAGE INPUT ==================
     const handleMessageChange = (event) => {
-        if (sendingRef.current) return;
+        if (requestSignIn() || sendingRef.current) return;
 
         setMessage(event.target.value);
         requestIdRef.current = null;
@@ -95,7 +120,7 @@ function ChatDashboard() {
 
     // ================== ATTACHMENTS ==================
     const handleAttachmentsChange = (files) => {
-        if (sendingRef.current) return;
+        if (requestSignIn() || sendingRef.current) return;
 
         setAttachments(files);
         requestIdRef.current = null;
@@ -103,7 +128,7 @@ function ChatDashboard() {
 
     // ================== STARTER PROMPT ==================
     const handleStarterPrompt = (prompt) => {
-        if (sendingRef.current) return;
+        if (requestSignIn() || sendingRef.current) return;
 
         setMessage(prompt);
         requestIdRef.current = null;
@@ -312,7 +337,7 @@ function ChatDashboard() {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        if (sendingRef.current) return;
+        if (requestSignIn() || sendingRef.current) return;
 
         const content = message.trim();
         const selectedFiles = [...attachments];
@@ -441,17 +466,22 @@ function ChatDashboard() {
                 </div>
 
                 {/* ================== MESSAGE COMPOSER ================== */}
-                <MessageComposer
-                    inputId="new-chat-message"
-                    inputRef={inputRef}
-                    value={message}
-                    onChange={handleMessageChange}
-                    attachments={attachments}
-                    onAttachmentsChange={handleAttachmentsChange}
-                    onSubmit={handleSubmit}
-                    placeholder="Ask QueryNest AI anything..."
-                    sending={sending}
-                />
+                <div
+                    style={{ width: "100%" }}
+                    onClickCapture={handleComposerClickCapture}
+                >
+                    <MessageComposer
+                        inputId="new-chat-message"
+                        inputRef={inputRef}
+                        value={message}
+                        onChange={handleMessageChange}
+                        attachments={attachments}
+                        onAttachmentsChange={handleAttachmentsChange}
+                        onSubmit={handleSubmit}
+                        placeholder="Ask QueryNest AI anything..."
+                        sending={sending}
+                    />
+                </div>
 
                 {/* ================== UPLOAD PROGRESS ================== */}
                 {uploadProgress !== null && (

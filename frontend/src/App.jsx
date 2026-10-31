@@ -54,18 +54,13 @@ function SessionFeedback() {
 
 // ================== ROOT REDIRECT ==================
 function RootRedirect() {
-    const { user, loading, authError } = useAuth();
+    const { loading, authError } = useAuth();
 
     if (loading || authError) {
         return <SessionFeedback />;
     }
 
-    return (
-        <Navigate
-            to={user ? "/chat" : "/login"}
-            replace
-        />
-    );
+    return <Navigate to="/chat" replace />;
 }
 
 // ================== GUEST ACCESS ==================
@@ -83,6 +78,28 @@ function GuestAccess() {
     return <Outlet />;
 }
 
+// ================== CHAT ACCESS ==================
+function ChatAccess() {
+    const { user, loading, authError } = useAuth();
+
+    if (loading || authError) {
+        return <SessionFeedback />;
+    }
+
+    if (user && user.role !== "user") {
+        return (
+            <section className="container py-5 text-center">
+                <h2>Access Denied</h2>
+                <p>
+                    You do not have permission to access this page.
+                </p>
+            </section>
+        );
+    }
+
+    return <Outlet />;
+}
+
 // ================== USER ACCESS ==================
 function UserAccess() {
     const { user, loading, authError } = useAuth();
@@ -92,7 +109,13 @@ function UserAccess() {
     }
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        return (
+            <Navigate
+                to="/chat"
+                replace
+                state={{ authRequired: true }}
+            />
+        );
     }
 
     if (user.role !== "user") {
@@ -160,28 +183,32 @@ function App() {
                     />
                 </Route>
 
-                {/* ================== USER PANEL ================== */}
-                <Route element={<UserAccess />}>
+                {/* ================== CHAT ACCESS ================== */}
+                <Route element={<ChatAccess />}>
                     <Route element={<ChatLayout />}>
 
-                        {/* ================== NEW CHAT ================== */}
+                        {/* ================== PUBLIC CHAT DASHBOARD ================== */}
                         <Route
                             path="/chat"
                             element={<ChatDashboard />}
                         />
 
-                        {/* ================== CONVERSATION ================== */}
-                        <Route
-                            path="/chat/:conversationId"
-                            element={<Conversation />}
-                        />
+                        {/* ================== PROTECTED USER ROUTES ================== */}
+                        <Route element={<UserAccess />}>
 
-                        {/* ================== MY PROFILE ================== */}
-                        <Route
-                            path="/profile"
-                            element={<Profile />}
-                        />
+                            {/* Conversation */}
+                            <Route
+                                path="/chat/:conversationId"
+                                element={<Conversation />}
+                            />
 
+                            {/* My Profile */}
+                            <Route
+                                path="/profile"
+                                element={<Profile />}
+                            />
+
+                        </Route>
                     </Route>
                 </Route>
 
