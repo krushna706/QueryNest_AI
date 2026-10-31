@@ -1,20 +1,29 @@
 
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from "react-router-dom";
+import {
+    BrowserRouter,
+    Routes,
+    Route,
+    Navigate,
+    Outlet,
+    Link,
+} from "react-router-dom";
+
 import { ToastContainer } from "react-toastify";
 
 import { useAuth } from "./context/AuthContext";
 
-// Authentication
+// ================== AUTHENTICATION ==================
 import Login from "./auth/Login";
 import Signup from "./auth/Signup";
 import ForgotPassword from "./auth/ForgotPassword";
 
-// Layout
+// ================== LAYOUT ==================
 import ChatLayout from "./layouts/ChatLayout";
 
-// User Panel
+// ================== USER PANEL ==================
 import ChatDashboard from "./user/ChatDashboard";
 import Conversation from "./user/Conversation";
+import Profile from "./user/Profile";
 
 // ================== SESSION FEEDBACK ==================
 function SessionFeedback() {
@@ -107,7 +116,10 @@ function NotFound() {
             <h2>404 - Page Not Found</h2>
             <p>The requested page could not be found.</p>
 
-            <Link to="/" className="btn btn-primary">
+            <Link
+                to="/"
+                className="btn btn-primary"
+            >
                 Go Home
             </Link>
         </section>
@@ -124,44 +136,56 @@ function App() {
             />
 
             <Routes>
-                {/* Root */}
+                {/* ================== ROOT ================== */}
                 <Route
                     path="/"
                     element={<RootRedirect />}
                 />
 
-                {/* Authentication */}
+                {/* ================== AUTHENTICATION ================== */}
                 <Route element={<GuestAccess />}>
                     <Route
                         path="/login"
                         element={<Login />}
                     />
+
                     <Route
                         path="/signup"
                         element={<Signup />}
                     />
+
                     <Route
                         path="/forgot-password"
                         element={<ForgotPassword />}
                     />
                 </Route>
 
-                {/* User Panel */}
+                {/* ================== USER PANEL ================== */}
                 <Route element={<UserAccess />}>
                     <Route element={<ChatLayout />}>
+
+                        {/* ================== NEW CHAT ================== */}
                         <Route
                             path="/chat"
                             element={<ChatDashboard />}
                         />
 
+                        {/* ================== CONVERSATION ================== */}
                         <Route
                             path="/chat/:conversationId"
                             element={<Conversation />}
                         />
+
+                        {/* ================== MY PROFILE ================== */}
+                        <Route
+                            path="/profile"
+                            element={<Profile />}
+                        />
+
                     </Route>
                 </Route>
 
-                {/* Not Found */}
+                {/* ================== NOT FOUND ================== */}
                 <Route
                     path="*"
                     element={<NotFound />}
