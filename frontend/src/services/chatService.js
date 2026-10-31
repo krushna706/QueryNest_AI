@@ -1,4 +1,3 @@
-
 import api from "./api";
 
 // ================== REQUEST ID ==================
@@ -68,7 +67,6 @@ async function sendMessage(
     clientRequestId,
     attachmentIds = []
 ) {
-    // ================== DOCUMENT VALIDATION ==================
     if (!Array.isArray(attachmentIds)) {
         throw new Error("Attachments must be an array.");
     }
@@ -94,7 +92,6 @@ async function sendMessage(
         );
     }
 
-    // ================== SAVE MESSAGE ==================
     const { data } = await api.post(
         `/chats/${conversationId}/messages`,
         {
@@ -196,7 +193,6 @@ function createAIError(
             ? details.error
             : {};
 
-    // ================== SERVER ERROR MESSAGE ==================
     const serverMessage =
         nestedError.message ||
         details.message ||
@@ -212,7 +208,6 @@ function createAIError(
             ? serverMessage.trim()
             : fallback;
 
-    // ================== ERROR CODE ==================
     const providedCode =
         nestedError.code ||
         details.code ||
@@ -224,7 +219,6 @@ function createAIError(
             ? providedCode.trim().toUpperCase()
             : null;
 
-    // ================== HTTP STATUS ==================
     const providedStatus =
         nestedError.status ??
         details.status ??
@@ -239,7 +233,6 @@ function createAIError(
             ? numericStatus
             : null;
 
-    // ================== RETRY DURATION ==================
     const retryAfterSeconds = parseRetryAfter(
         nestedError.retryAfterSeconds ??
         details.retryAfterSeconds ??
@@ -248,7 +241,6 @@ function createAIError(
         retryAfter
     );
 
-    // ================== CREATE ERROR ==================
     const error = new Error(message);
 
     error.name = "AIResponseError";
@@ -288,7 +280,6 @@ function processStreamEvent(block, onEvent) {
 
     const dataLines = [];
 
-    // ================== READ SSE FIELDS ==================
     for (const line of block.split(/\r?\n/)) {
         if (
             !line ||
@@ -299,7 +290,6 @@ function processStreamEvent(block, onEvent) {
 
         if (line.startsWith("event:")) {
             eventType = line.slice(6).trim();
-
         } else if (line.startsWith("data:")) {
             dataLines.push(
                 line.slice(5).trimStart()
@@ -311,14 +301,12 @@ function processStreamEvent(block, onEvent) {
         return false;
     }
 
-    // ================== PARSE EVENT DATA ==================
     let data;
 
     try {
         data = JSON.parse(
             dataLines.join("\n")
         );
-
     } catch {
         throw createAIError(
             {
@@ -331,7 +319,6 @@ function processStreamEvent(block, onEvent) {
         );
     }
 
-    // ================== SERVER ERROR EVENT ==================
     if (eventType === "error") {
         throw createAIError(data, {
             fallback:
@@ -339,7 +326,6 @@ function processStreamEvent(block, onEvent) {
         });
     }
 
-    // ================== FORWARD NORMAL EVENT ==================
     onEvent?.({
         type: eventType,
         data,
@@ -358,7 +344,6 @@ async function generateAIResponse(
         onEvent,
     } = {}
 ) {
-    // ================== VALIDATE IDS ==================
     const validConversationId = validateMessageId(
         conversationId,
         "Conversation ID"
@@ -369,7 +354,6 @@ async function generateAIResponse(
         "Message ID"
     );
 
-    // ================== API BASE URL ==================
     const baseURL =
         api.defaults.baseURL?.replace(/\/$/, "");
 
@@ -379,7 +363,6 @@ async function generateAIResponse(
         );
     }
 
-    // ================== SEND STREAM REQUEST ==================
     const response = await fetch(
         `${baseURL}/chats/${validConversationId}/generate`,
         {
@@ -401,7 +384,6 @@ async function generateAIResponse(
         }
     );
 
-    // ================== HTTP ERROR ==================
     if (!response.ok) {
         const errorData = await response
             .json()
@@ -420,7 +402,6 @@ async function generateAIResponse(
         });
     }
 
-    // ================== STREAM AVAILABILITY ==================
     if (!response.body) {
         throw createAIError(
             {
@@ -433,7 +414,6 @@ async function generateAIResponse(
         );
     }
 
-    // ================== STREAM READER ==================
     const reader =
         response.body.getReader();
 
@@ -444,7 +424,6 @@ async function generateAIResponse(
     let completed = false;
 
     try {
-        // ================== READ STREAM ==================
         while (!completed) {
             const {
                 done,
@@ -459,7 +438,6 @@ async function generateAIResponse(
                 stream: true,
             });
 
-            // ================== PROCESS COMPLETE EVENTS ==================
             let boundary = /\r?\n\r?\n/.exec(buffer);
 
             while (boundary) {
@@ -487,7 +465,6 @@ async function generateAIResponse(
                     /\r?\n\r?\n/.exec(buffer);
             }
 
-            // ================== STREAM SIZE PROTECTION ==================
             if (
                 buffer.length >
                 1024 * 1024
@@ -505,7 +482,6 @@ async function generateAIResponse(
             }
         }
 
-        // ================== PROCESS FINAL BUFFER ==================
         if (!completed) {
             buffer += decoder.decode();
 
@@ -517,7 +493,6 @@ async function generateAIResponse(
             }
         }
 
-        // ================== INCOMPLETE STREAM ==================
         if (!completed) {
             throw createAIError(
                 {
@@ -530,9 +505,7 @@ async function generateAIResponse(
                 }
             );
         }
-
     } finally {
-        // ================== RELEASE STREAM ==================
         if (!completed) {
             await reader
                 .cancel()

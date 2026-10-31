@@ -1,4 +1,3 @@
-
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TextField, InputAdornment, IconButton, Button } from "@mui/material";
@@ -48,7 +47,6 @@ function Signup() {
 
     const submitLock = useRef(false);
 
-    // ================== SIGNUP SUBMISSION ==================
     async function handleSubmit(event) {
         event.preventDefault();
 
@@ -66,7 +64,6 @@ function Signup() {
         const password = String(formData.get("password") || "");
         const confirmPassword = String(formData.get("confirmPassword") || "");
 
-        // ================== FORM VALIDATION ==================
         if (name.length < 2 || name.length > 100) {
             toast.error("Name must contain between 2 and 100 characters.");
             return;
@@ -101,7 +98,6 @@ function Signup() {
             return;
         }
 
-        // ================== CREATE ACCOUNT ==================
         submitLock.current = true;
         setIsSubmitting(true);
 
@@ -128,16 +124,8 @@ function Signup() {
     const formDisabled = loading || isSubmitting;
 
     return (
-        <AuthLayout
-            title="Create Account"
-            description="Join QueryNest AI and start exploring smarter conversations."
-        >
-            <form
-                className="auth-form"
-                onSubmit={handleSubmit}
-                aria-busy={formDisabled}
-                noValidate
-            >
+        <AuthLayout title="Create Account" description="Join QueryNest AI and start exploring smarter conversations.">
+            <form className="auth-form" onSubmit={handleSubmit} aria-busy={formDisabled} noValidate>
                 {/* Full Name */}
                 <TextField
                     id="signup-name"
@@ -229,10 +217,7 @@ function Signup() {
                                         onMouseDown={(event) => event.preventDefault()}
                                         edge="end"
                                     >
-                                        <i
-                                            className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`}
-                                            aria-hidden="true"
-                                        />
+                                        <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -269,10 +254,7 @@ function Signup() {
                                         onMouseDown={(event) => event.preventDefault()}
                                         edge="end"
                                     >
-                                        <i
-                                            className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`}
-                                            aria-hidden="true"
-                                        />
+                                        <i className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -281,24 +263,14 @@ function Signup() {
                 />
 
                 {/* Submit */}
-                <Button
-                    type="submit"
-                    variant="contained"
-                    className="auth-submit"
-                    disabled={formDisabled}
-                    disableElevation
-                    fullWidth
-                >
+                <Button type="submit" variant="contained" className="auth-submit" disabled={formDisabled} disableElevation fullWidth>
                     {loading
                         ? "Checking session..."
                         : isSubmitting
                           ? "Creating account..."
                           : "Create Account"}
 
-                    <i
-                        className="fa-solid fa-arrow-right"
-                        aria-hidden="true"
-                    />
+                    <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </Button>
             </form>
 

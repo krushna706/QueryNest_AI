@@ -1,14 +1,6 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-    Avatar,
-    Drawer,
-    IconButton,
-    Menu,
-    MenuItem,
-    useMediaQuery,
-} from "@mui/material";
+import { Avatar, Drawer, IconButton, Menu, MenuItem, useMediaQuery } from "@mui/material";
 import { toast } from "react-toastify";
 
 import { useAuth } from "../../context/AuthContext";
@@ -34,7 +26,6 @@ function SidebarContent({
     const menuOpen = Boolean(menuAnchor);
     const guestMode = isGuest || !user;
 
-    // ================== USER DETAILS ==================
     const userName = user?.name || "Guest";
     const userEmail = user?.email || "";
     const avatarUrl = user?.avatar?.url || user?.avatarUrl || "";
@@ -46,7 +37,6 @@ function SidebarContent({
         .map((part) => part.charAt(0).toUpperCase())
         .join("");
 
-    // ================== GUEST AUTHENTICATION ==================
     const handleGuestAuth = () => {
         if (!guestMode) return false;
 
@@ -59,7 +49,6 @@ function SidebarContent({
         return true;
     };
 
-    // ================== NEW CHAT ==================
     const handleNewChat = (event) => {
         if (guestMode) {
             event.preventDefault();
@@ -71,7 +60,6 @@ function SidebarContent({
         onClose?.();
     };
 
-    // ================== SEARCH CONVERSATIONS ==================
     const handleSearchChange = (event) => {
         if (guestMode) {
             handleGuestAuth();
@@ -81,7 +69,6 @@ function SidebarContent({
         onSearchChange(event.target.value);
     };
 
-    // ================== PROFILE MENU ==================
     const handleOpenMenu = (event) => {
         if (handleGuestAuth()) return;
 
@@ -98,7 +85,6 @@ function SidebarContent({
         navigate(path);
     };
 
-    // ================== LOGOUT ==================
     const handleLogout = async () => {
         if (guestMode || loggingOut) return;
 
@@ -124,27 +110,9 @@ function SidebarContent({
 
     return (
         <>
-            {/* ================== SIDEBAR HEADER ================== */}
             <div className="chat-sidebar-header">
-                <Link
-                    to="/chat"
-                    className="chat-sidebar-brand"
-                    onClick={onClose}
-                    aria-label="QueryNest AI Home"
-                >
-                    <img
-                        src="/images/QueryNest_AI_Logo.png"
-                        alt="QueryNest AI"
-                        className="chat-brand-logo"
-                        style={{
-                            display: "block",
-                            width: "100%",
-                            maxWidth: "185px",
-                            maxHeight: "58px",
-                            height: "auto",
-                            objectFit: "contain",
-                        }}
-                    />
+                <Link to="/chat" className="chat-sidebar-brand" onClick={onClose} aria-label="QueryNest AI Home">
+                    <img src="/images/QueryNest_AI_Logo.png" alt="QueryNest AI" className="chat-brand-logo qn-chat-brand-image" />
                 </Link>
 
                 <IconButton
@@ -157,34 +125,17 @@ function SidebarContent({
                     }
                     onClick={isMobile ? onClose : onToggle}
                 >
-                    <i
-                        className="fa-solid fa-bars"
-                        aria-hidden="true"
-                    />
+                    <i className="fa-solid fa-bars" aria-hidden="true" />
                 </IconButton>
             </div>
-
-            {/* ================== NEW CHAT ================== */}
             <div className="chat-sidebar-actions">
-                <Link
-                    to="/chat"
-                    className="chat-new-button"
-                    onClick={handleNewChat}
-                >
-                    <i
-                        className="fa-solid fa-plus"
-                        aria-hidden="true"
-                    />
+                <Link to="/chat" className="chat-new-button" onClick={handleNewChat}>
+                    <i className="fa-solid fa-plus" aria-hidden="true" />
                     <span>New Chat</span>
                 </Link>
             </div>
-
-            {/* ================== SEARCH CONVERSATIONS ================== */}
             <div className="chat-sidebar-search">
-                <i
-                    className="fa-solid fa-magnifying-glass"
-                    aria-hidden="true"
-                />
+                <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
 
                 <input
                     type="search"
@@ -202,12 +153,7 @@ function SidebarContent({
                     autoComplete="off"
                 />
             </div>
-
-            {/* ================== CHAT HISTORY ================== */}
-            <nav
-                className="chat-sidebar-history"
-                aria-label="Chat history"
-            >
+            <nav className="chat-sidebar-history" aria-label="Chat history">
                 <p className="chat-sidebar-label">
                     YOUR CONVERSATIONS
                 </p>
@@ -220,8 +166,6 @@ function SidebarContent({
                     children
                 )}
             </nav>
-
-            {/* ================== USER PROFILE ================== */}
             <div className="chat-sidebar-bottom">
                 <button
                     type="button"
@@ -245,20 +189,9 @@ function SidebarContent({
                             : undefined
                     }
                 >
-                    <Avatar
-                        src={
-                            !guestMode && avatarUrl
-                                ? avatarUrl
-                                : undefined
-                        }
-                        alt={userName}
-                        className="chat-account-avatar"
-                    >
+                    <Avatar src={ !guestMode && avatarUrl ? avatarUrl : undefined } alt={userName} className="chat-account-avatar">
                         {guestMode ? (
-                            <i
-                                className="fa-regular fa-user"
-                                aria-hidden="true"
-                            />
+                            <i className="fa-regular fa-user" aria-hidden="true" />
                         ) : (
                             !avatarUrl && initials
                         )}
@@ -286,8 +219,6 @@ function SidebarContent({
                     />
                 </button>
             </div>
-
-            {/* ================== ACCOUNT MENU ================== */}
             {!guestMode && (
                 <Menu
                     id="chat-account-menu"
@@ -309,11 +240,7 @@ function SidebarContent({
                     }}
                 >
                     <div className="chat-account-menu-header">
-                        <Avatar
-                            src={avatarUrl || undefined}
-                            alt={userName}
-                            className="chat-account-avatar"
-                        >
+                        <Avatar src={avatarUrl || undefined} alt={userName} className="chat-account-avatar">
                             {!avatarUrl && initials}
                         </Avatar>
 
@@ -325,43 +252,20 @@ function SidebarContent({
 
                     <div className="chat-account-menu-divider" />
 
-                    <MenuItem
-                        className="chat-account-menu-item"
-                        onClick={() =>
-                            handleNavigation("/chat")
-                        }
-                    >
-                        <i
-                            className="fa-solid fa-house"
-                            aria-hidden="true"
-                        />
+                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/chat") }>
+                        <i className="fa-solid fa-house" aria-hidden="true" />
                         <span>Dashboard</span>
                     </MenuItem>
 
-                    <MenuItem
-                        className="chat-account-menu-item"
-                        onClick={() =>
-                            handleNavigation("/profile")
-                        }
-                    >
-                        <i
-                            className="fa-regular fa-user"
-                            aria-hidden="true"
-                        />
+                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/profile") }>
+                        <i className="fa-regular fa-user" aria-hidden="true" />
                         <span>My Profile</span>
                     </MenuItem>
 
                     <div className="chat-account-menu-divider" />
 
-                    <MenuItem
-                        className="chat-account-menu-item chat-account-logout"
-                        onClick={handleLogout}
-                        disabled={loggingOut}
-                    >
-                        <i
-                            className="fa-solid fa-right-from-bracket"
-                            aria-hidden="true"
-                        />
+                    <MenuItem className="chat-account-menu-item chat-account-logout" onClick={handleLogout} disabled={loggingOut}>
+                        <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />
                         <span>Logout</span>
                     </MenuItem>
                 </Menu>
@@ -402,7 +306,6 @@ function ChatSidebar({
         </SidebarContent>
     );
 
-    // ================== MOBILE SIDEBAR ==================
     if (isMobile) {
         return (
             <Drawer
@@ -428,13 +331,8 @@ function ChatSidebar({
         );
     }
 
-    // ================== DESKTOP SIDEBAR ==================
     return (
-        <aside
-            id="chat-sidebar"
-            className="chat-sidebar chat-sidebar-desktop"
-            aria-label="Chat navigation"
-        >
+        <aside id="chat-sidebar" className="chat-sidebar chat-sidebar-desktop" aria-label="Chat navigation">
             {sidebarContent}
         </aside>
     );

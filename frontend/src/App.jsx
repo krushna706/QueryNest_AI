@@ -1,12 +1,4 @@
-
-import {
-    BrowserRouter,
-    Routes,
-    Route,
-    Navigate,
-    Outlet,
-    Link,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from "react-router-dom";
 
 import { ToastContainer } from "react-toastify";
 
@@ -39,11 +31,7 @@ function SessionFeedback() {
                 <>
                     <p role="alert">{authError}</p>
 
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => refreshUser()}
-                    >
+                    <button type="button" className="btn btn-primary" onClick={() => refreshUser()}>
                         Try Again
                     </button>
                 </>
@@ -110,11 +98,7 @@ function UserAccess() {
 
     if (!user) {
         return (
-            <Navigate
-                to="/chat"
-                replace
-                state={{ authRequired: true }}
-            />
+            <Navigate to="/chat" replace state={{ authRequired: true }} />
         );
     }
 
@@ -139,10 +123,7 @@ function NotFound() {
             <h2>404 - Page Not Found</h2>
             <p>The requested page could not be found.</p>
 
-            <Link
-                to="/"
-                className="btn btn-primary"
-            >
+            <Link to="/" className="btn btn-primary">
                 Go Home
             </Link>
         </section>
@@ -153,70 +134,32 @@ function NotFound() {
 function App() {
     return (
         <BrowserRouter>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-            />
+            <ToastContainer position="top-right" autoClose={3000} />
 
             <Routes>
-                {/* ================== ROOT ================== */}
-                <Route
-                    path="/"
-                    element={<RootRedirect />}
-                />
-
-                {/* ================== AUTHENTICATION ================== */}
+                <Route path="/" element={<RootRedirect />} />
                 <Route element={<GuestAccess />}>
-                    <Route
-                        path="/login"
-                        element={<Login />}
-                    />
+                    <Route path="/login" element={<Login />} />
 
-                    <Route
-                        path="/signup"
-                        element={<Signup />}
-                    />
+                    <Route path="/signup" element={<Signup />} />
 
-                    <Route
-                        path="/forgot-password"
-                        element={<ForgotPassword />}
-                    />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                 </Route>
-
-                {/* ================== CHAT ACCESS ================== */}
                 <Route element={<ChatAccess />}>
                     <Route element={<ChatLayout />}>
-
-                        {/* ================== PUBLIC CHAT DASHBOARD ================== */}
-                        <Route
-                            path="/chat"
-                            element={<ChatDashboard />}
-                        />
-
-                        {/* ================== PROTECTED USER ROUTES ================== */}
+                        <Route path="/chat" element={<ChatDashboard />} />
                         <Route element={<UserAccess />}>
 
                             {/* Conversation */}
-                            <Route
-                                path="/chat/:conversationId"
-                                element={<Conversation />}
-                            />
+                            <Route path="/chat/:conversationId" element={<Conversation />} />
 
                             {/* My Profile */}
-                            <Route
-                                path="/profile"
-                                element={<Profile />}
-                            />
+                            <Route path="/profile" element={<Profile />} />
 
                         </Route>
                     </Route>
                 </Route>
-
-                {/* ================== NOT FOUND ================== */}
-                <Route
-                    path="*"
-                    element={<NotFound />}
-                />
+                <Route path="*" element={<NotFound />} />
             </Routes>
         </BrowserRouter>
     );

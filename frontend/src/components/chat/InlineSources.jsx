@@ -1,4 +1,3 @@
-
 import { Fragment } from "react";
 
 // ================== SOURCE LABEL ==================
@@ -16,7 +15,6 @@ function getSourceLabel(source) {
             ? source.filename.trim()
             : "Document";
 
-    // ================== PDF PAGE ==================
     if (
         source.fileType === "pdf" &&
         Number.isInteger(source.pageNumber) &&
@@ -25,7 +23,6 @@ function getSourceLabel(source) {
         return `${filename} — Page ${source.pageNumber}`;
     }
 
-    // ================== DOCX SECTION ==================
     if (source.fileType === "docx") {
         const section =
             typeof source.sectionTitle === "string"
@@ -77,7 +74,6 @@ function getSourceExcerpt(source) {
 
 // ================== INLINE SOURCES ==================
 function InlineSources({ sources = [] }) {
-    // ================== VALIDATE SOURCE DATA ==================
     const validSources = Array.isArray(sources)
         ? sources.filter(
             (source) =>
@@ -92,16 +88,9 @@ function InlineSources({ sources = [] }) {
     }
 
     return (
-        <section
-            className="inline-sources mt-3"
-            aria-label="AI response document sources"
-        >
-            {/* ================== SECTION HEADING ================== */}
+        <section className="inline-sources mt-3" aria-label="AI response document sources">
             <div className="d-flex align-items-center gap-2 mb-2">
-                <i
-                    className="fa-regular fa-file-lines text-secondary"
-                    aria-hidden="true"
-                />
+                <i className="fa-regular fa-file-lines text-secondary" aria-hidden="true" />
 
                 <span className="fw-semibold small">
                     Sources
@@ -111,8 +100,6 @@ function InlineSources({ sources = [] }) {
                     ({validSources.length})
                 </span>
             </div>
-
-            {/* ================== CITATION CHIPS ================== */}
             <div className="d-flex flex-wrap gap-2">
                 {validSources.map((source, index) => {
                     const citationId = getCitationId(
@@ -144,67 +131,28 @@ function InlineSources({ sources = [] }) {
                     return (
                         <Fragment key={sourceKey}>
                             <details
-                                className="inline-source-item border rounded-3"
-                                style={{
-                                    backgroundColor:
-                                        "var(--bs-tertiary-bg, #f8fafc)",
-                                    maxWidth: "100%",
-                                    minWidth: 0,
-                                }}
+                                className="inline-source-item border rounded-3 qn-source-item"
                             >
-                                {/* ================== SOURCE CHIP ================== */}
                                 <summary
-                                    className="d-flex align-items-center gap-2 px-3 py-2"
-                                    style={{
-                                        cursor: "pointer",
-                                        listStyle: "none",
-                                        maxWidth: "100%",
-                                    }}
+                                    className="d-flex align-items-center gap-2 px-3 py-2 qn-source-summary"
+                                    
                                     title={label}
                                 >
-                                    <i
-                                        className={iconClass}
-                                        aria-hidden="true"
-                                        style={{
-                                            color: "#2563eb",
-                                        }}
-                                    />
+                                    <i className={`${iconClass} qn-source-icon`} aria-hidden="true"  />
 
-                                    <strong
-                                        className="small"
-                                        style={{
-                                            color: "#2563eb",
-                                        }}
-                                    >
+                                    <strong className="small qn-source-index" >
                                         [{citationId}]
                                     </strong>
 
-                                    <span
-                                        className="small"
-                                        style={{
-                                            overflowWrap: "anywhere",
-                                            minWidth: 0,
-                                        }}
-                                    >
+                                    <span className="small qn-source-label" >
                                         {label}
                                     </span>
 
-                                    <i
-                                        className="fa-solid fa-chevron-down text-secondary ms-auto"
-                                        aria-hidden="true"
-                                        style={{
-                                            fontSize: "0.65rem",
-                                        }}
-                                    />
+                                    <i className="fa-solid fa-chevron-down text-secondary ms-auto qn-source-expand-icon" aria-hidden="true"  />
                                 </summary>
-
-                                {/* ================== EXPANDED SOURCE ================== */}
                                 <div className="border-top px-3 py-3">
                                     <div className="d-flex align-items-center gap-2 mb-2">
-                                        <i
-                                            className="fa-solid fa-quote-left text-secondary"
-                                            aria-hidden="true"
-                                        />
+                                        <i className="fa-solid fa-quote-left text-secondary" aria-hidden="true" />
 
                                         <span className="fw-semibold small">
                                             Extracted Source Text
@@ -212,14 +160,7 @@ function InlineSources({ sources = [] }) {
                                     </div>
 
                                     {excerpt ? (
-                                        <p
-                                            className="small mb-0"
-                                            style={{
-                                                whiteSpace: "pre-wrap",
-                                                overflowWrap: "anywhere",
-                                                lineHeight: 1.7,
-                                            }}
-                                        >
+                                        <p className="small mb-0 qn-source-excerpt" >
                                             {excerpt}
                                         </p>
                                     ) : (
@@ -227,14 +168,9 @@ function InlineSources({ sources = [] }) {
                                             Source text is not available.
                                         </p>
                                     )}
-
-                                    {/* ================== SOURCE LOCATION ================== */}
                                     <div className="border-top mt-3 pt-2">
                                         <span className="text-secondary small">
-                                            <i
-                                                className="fa-solid fa-link me-2"
-                                                aria-hidden="true"
-                                            />
+                                            <i className="fa-solid fa-link me-2" aria-hidden="true" />
 
                                             {label}
                                         </span>

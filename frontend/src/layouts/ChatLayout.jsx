@@ -1,16 +1,6 @@
-
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    IconButton,
-    useMediaQuery,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, useMediaQuery } from "@mui/material";
 
 import { useAuth } from "../context/AuthContext";
 import ChatSidebar from "../components/chat/ChatSidebar";
@@ -33,7 +23,6 @@ function ChatLayout() {
 
     const isGuest = !user;
 
-    // ================== AUTHENTICATION REQUIRED ==================
     const requireAuth = useCallback(() => {
         if (user) {
             return true;
@@ -45,7 +34,6 @@ function ChatLayout() {
         return false;
     }, [user]);
 
-    // ================== AUTH DIALOG ==================
     const handleCloseAuthDialog = () => {
         setAuthDialogOpen(false);
     };
@@ -56,7 +44,6 @@ function ChatLayout() {
         navigate(path);
     };
 
-    // ================== PROTECTED ROUTE FEEDBACK ==================
     useEffect(() => {
         if (!isGuest || !location.state?.authRequired) {
             return;
@@ -75,7 +62,6 @@ function ChatLayout() {
         navigate,
     ]);
 
-    // ================== SIDEBAR CONTROLS ==================
     const handleToggleSidebar = () => {
         if (isMobile) {
             setMobileOpen((current) => !current);
@@ -88,12 +74,10 @@ function ChatLayout() {
         setMobileOpen(false);
     };
 
-    // ================== ROUTE CHANGE ==================
     useEffect(() => {
         setMobileOpen(false);
     }, [location.pathname]);
 
-    // ================== NEW CHAT ==================
     const handleNewChat = () => {
         if (!requireAuth()) {
             return;
@@ -109,14 +93,7 @@ function ChatLayout() {
         : !sidebarOpen;
 
     return (
-        <div
-            className={`chat-layout ${
-                !isMobile && !sidebarOpen
-                    ? "chat-layout-collapsed"
-                    : ""
-            }`}
-        >
-            {/* ================== CHAT SIDEBAR ================== */}
+        <div className={`chat-layout ${ !isMobile && !sidebarOpen ? "chat-layout-collapsed" : "" }`}>
             <ChatSidebar
                 isMobile={isMobile}
                 mobileOpen={mobileOpen}
@@ -133,14 +110,9 @@ function ChatLayout() {
                         Sign in to access your conversations.
                     </p>
                 ) : (
-                    <ChatHistory
-                        search={search}
-                        onClose={handleCloseSidebar}
-                    />
+                    <ChatHistory search={search} onClose={handleCloseSidebar} />
                 )}
             </ChatSidebar>
-
-            {/* ================== MAIN CONTENT ================== */}
             <main className="chat-main">
 
                 {/* Sidebar Reopen */}
@@ -154,27 +126,16 @@ function ChatLayout() {
                             aria-expanded={false}
                             onClick={handleToggleSidebar}
                         >
-                            <i
-                                className="fa-solid fa-bars"
-                                aria-hidden="true"
-                            />
+                            <i className="fa-solid fa-bars" aria-hidden="true" />
                         </IconButton>
                     </div>
                 )}
 
                 {/* Chat Page */}
                 <div className="chat-main-content">
-                    <Outlet
-                        key={newChatKey}
-                        context={{
-                            requireAuth,
-                            isGuest,
-                        }}
-                    />
+                    <Outlet key={newChatKey} context={{ requireAuth, isGuest, }} />
                 </div>
             </main>
-
-            {/* ================== SIGN IN REQUIRED ================== */}
             <Dialog
                 open={isGuest && authDialogOpen}
                 onClose={handleCloseAuthDialog}
@@ -182,52 +143,21 @@ function ChatLayout() {
                 aria-describedby="guest-auth-description"
                 fullWidth
                 maxWidth="xs"
-                slotProps={{
-                    paper: {
-                        sx: {
-                            borderRadius: "18px",
-                            padding: "8px",
-                            boxShadow:
-                                "0 20px 55px rgba(15, 23, 42, 0.22)",
-                        },
-                    },
-                }}
+                slotProps={{ paper: { className: "qn-guest-dialog-paper" } }}
             >
-                <DialogTitle
-                    id="guest-auth-title"
-                    sx={{
-                        textAlign: "center",
-                        fontWeight: 700,
-                        color: "#0f172a",
-                        paddingTop: 3,
-                    }}
-                >
+                <DialogTitle id="guest-auth-title" className="qn-guest-dialog-title">
                     Sign in to QueryNest AI
                 </DialogTitle>
 
                 <DialogContent>
-                    <DialogContentText
-                        id="guest-auth-description"
-                        sx={{
-                            color: "#64748b",
-                            textAlign: "center",
-                            lineHeight: 1.7,
-                        }}
-                    >
+                    <DialogContentText id="guest-auth-description" className="qn-guest-dialog-description">
                         Sign in to start conversations,
                         upload documents, and access
                         your chat history.
                     </DialogContentText>
                 </DialogContent>
 
-                <DialogActions
-                    sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1.5,
-                        padding: "0 20px 20px",
-                    }}
-                >
+                <DialogActions className="qn-guest-dialog-actions">
                     <Button
                         type="button"
                         variant="contained"
@@ -236,15 +166,7 @@ function ChatLayout() {
                         onClick={() =>
                             handleAuthNavigation("/login")
                         }
-                        sx={{
-                            margin: "0 !important",
-                            paddingY: 1.3,
-                            borderRadius: "10px",
-                            fontWeight: 600,
-                            textTransform: "none",
-                            background:
-                                "linear-gradient(110deg, #2563eb, #6d28d9)",
-                        }}
+                        className="qn-guest-dialog-signin"
                     >
                         Sign In
                     </Button>
@@ -256,27 +178,12 @@ function ChatLayout() {
                         onClick={() =>
                             handleAuthNavigation("/signup")
                         }
-                        sx={{
-                            margin: "0 !important",
-                            paddingY: 1.3,
-                            borderRadius: "10px",
-                            fontWeight: 600,
-                            textTransform: "none",
-                        }}
+                        className="qn-guest-dialog-signup"
                     >
                         Create Account
                     </Button>
 
-                    <Button
-                        type="button"
-                        color="inherit"
-                        size="small"
-                        onClick={handleCloseAuthDialog}
-                        sx={{
-                            textTransform: "none",
-                            color: "#64748b",
-                        }}
-                    >
+                    <Button type="button" color="inherit" size="small" onClick={handleCloseAuthDialog} className="qn-guest-dialog-later">
                         Maybe Later
                     </Button>
                 </DialogActions>

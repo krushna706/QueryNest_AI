@@ -1,4 +1,3 @@
-
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { TextField, InputAdornment, IconButton, Button } from "@mui/material";
@@ -46,7 +45,6 @@ function Login() {
 
     const submitLock = useRef(false);
 
-    // ================== LOGIN SUBMISSION ==================
     async function handleSubmit(event) {
         event.preventDefault();
 
@@ -105,16 +103,8 @@ function Login() {
     const formDisabled = loading || isSubmitting;
 
     return (
-        <AuthLayout
-            title="Welcome Back"
-            description="Sign in to continue your conversations with QueryNest AI."
-        >
-            <form
-                className="auth-form"
-                onSubmit={handleSubmit}
-                aria-busy={formDisabled}
-                noValidate
-            >
+        <AuthLayout title="Welcome Back" description="Sign in to continue your conversations with QueryNest AI.">
+            <form className="auth-form" onSubmit={handleSubmit} aria-busy={formDisabled} noValidate>
                 {/* Email or Phone */}
                 <TextField
                     id="login-identifier"
@@ -174,14 +164,7 @@ function Login() {
                                         }
                                         edge="end"
                                     >
-                                        <i
-                                            className={`fa-solid ${
-                                                showPassword
-                                                    ? "fa-eye-slash"
-                                                    : "fa-eye"
-                                            }`}
-                                            aria-hidden="true"
-                                        />
+                                        <i className={`fa-solid ${ showPassword ? "fa-eye-slash" : "fa-eye" }`} aria-hidden="true" />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -190,24 +173,14 @@ function Login() {
                 />
 
                 {/* Submit */}
-                <Button
-                    type="submit"
-                    variant="contained"
-                    className="auth-submit"
-                    disabled={formDisabled}
-                    disableElevation
-                    fullWidth
-                >
+                <Button type="submit" variant="contained" className="auth-submit" disabled={formDisabled} disableElevation fullWidth>
                     {loading
                         ? "Checking session..."
                         : isSubmitting
                           ? "Signing in..."
                           : "Sign In"}
 
-                    <i
-                        className="fa-solid fa-arrow-right"
-                        aria-hidden="true"
-                    />
+                    <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </Button>
             </form>
 
@@ -220,10 +193,7 @@ function Login() {
                     </Link>
                 </p>
 
-                <Link
-                    to="/forgot-password"
-                    className="auth-forgot-link"
-                >
+                <Link to="/forgot-password" className="auth-forgot-link">
                     Forgot password?
                 </Link>
             </div>

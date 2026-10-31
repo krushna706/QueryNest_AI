@@ -105,8 +105,7 @@ function UsageProgress({ icon, title, value, limit }) {
 
 function UsagePeriodCard({ period, data, active, onClick }) {
     return (
-        <button type="button" className={`qnp-period ${active ? "active" : ""}`}
-            onClick={onClick} aria-pressed={active}>
+        <button type="button" className={`qnp-period ${active ? "active" : ""}`} onClick={onClick} aria-pressed={active}>
             <span className="qnp-period-top">
                 <span>{period.label}</span>
                 <i className={period.icon} aria-hidden="true" />
@@ -319,8 +318,6 @@ function Profile() {
 
     return (
         <main className="container-fluid qnp-page">
-
-            {/* ================== PROFILE HERO ================== */}
             <section className="qnp-hero">
                 <div className="qnp-hero-user">
                     <div className="qnp-hero-avatar">{avatarView}</div>
@@ -338,8 +335,6 @@ function Profile() {
                     <Link to="/chat" className="qnp-hero-chip"><i className="fa-solid fa-arrow-left" /> Back to Chat</Link>
                 </div>
             </section>
-
-            {/* ================== BALANCED MAIN GRID ================== */}
             <div className="qnp-main-grid">
                 <section className="qnp-card qnp-profile-card" aria-labelledby="qnp-personal-title">
                     <SectionHeading id="qnp-personal-title" title="Personal Information"
@@ -372,13 +367,11 @@ function Profile() {
                             </div>
                             <div className="qnp-field">
                                 <label className="qnp-label" htmlFor="qnp-email">Email Address</label>
-                                <input id="qnp-email" className="qnp-input" type="email"
-                                    value={user?.email || ""} readOnly />
+                                <input id="qnp-email" className="qnp-input" type="email" value={user?.email || ""} readOnly />
                             </div>
                             <div className="qnp-field">
                                 <label className="qnp-label" htmlFor="qnp-phone">Mobile Number</label>
-                                <input id="qnp-phone" className="qnp-input" type="text"
-                                    value={user?.phone || user?.mobile || ""} readOnly />
+                                <input id="qnp-phone" className="qnp-input" type="text" value={user?.phone || user?.mobile || ""} readOnly />
                             </div>
                         </div>
                         <div className="qnp-form-actions">
@@ -419,10 +412,8 @@ function Profile() {
                             <span><i className="fa-solid fa-chart-line" /> {currentLabel} — Detailed Usage</span>
                             <span className="qnp-note">Your account</span>
                         </div>
-                        <UsageProgress title="AI Requests" icon="fa-regular fa-comments"
-                            value={current.requests} limit={current.requestLimit} />
-                        <UsageProgress title="Tokens Consumed" icon="fa-solid fa-bolt"
-                            value={current.tokens} limit={current.tokenLimit} />
+                        <UsageProgress title="AI Requests" icon="fa-regular fa-comments" value={current.requests} limit={current.requestLimit} />
+                        <UsageProgress title="Tokens Consumed" icon="fa-solid fa-bolt" value={current.tokens} limit={current.tokenLimit} />
                         <div className="qnp-average">
                             <span>Average tokens per AI request</span>
                             <strong>{formatNumber(averageTokens)}</strong>
@@ -451,8 +442,6 @@ function Profile() {
                     </p>
                 </section>
             </div>
-
-            {/* ================== SECURITY AND HISTORY ================== */}
             <div className="qnp-lower-grid">
                 <section className="qnp-card" aria-labelledby="qnp-security-title">
                     <SectionHeading id="qnp-security-title" title="Security & Privacy"
@@ -496,8 +485,6 @@ function Profile() {
                 <span>QueryNest AI · Your personal AI workspace</span>
                 <span>Manage smarter. Work better.</span>
             </footer>
-
-            {/* ================== DELETE CONFIRMATION ================== */}
             {showDeleteDialog && (
                 <div className="qnp-modal-overlay">
                     <div className="qnp-modal" role="alertdialog" aria-modal="true"

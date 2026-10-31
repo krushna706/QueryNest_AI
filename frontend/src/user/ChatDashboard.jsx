@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -6,15 +5,9 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import MessageComposer from "../components/chat/MessageComposer";
 
-import {
-    createConversation,
-    sendMessage,
-    generateChatRequestId,
-} from "../services/chatService";
+import { createConversation, sendMessage, generateChatRequestId } from "../services/chatService";
 
-import {
-    uploadDocuments,
-} from "../services/documentService";
+import { uploadDocuments } from "../services/documentService";
 
 // ================== STARTER PROMPTS ==================
 const starterPrompts = [
@@ -64,7 +57,6 @@ function ChatDashboard() {
     const { requireAuth } = useOutletContext() || {};
     const isGuest = !user;
 
-    // ================== GUEST AUTHENTICATION ==================
     const requestSignIn = () => {
         if (!isGuest) return false;
 
@@ -77,7 +69,6 @@ function ChatDashboard() {
         return true;
     };
 
-    // ================== GUEST COMPOSER INTERACTIONS ==================
     const handleComposerClickCapture = (event) => {
         if (!isGuest) return;
 
@@ -87,13 +78,11 @@ function ChatDashboard() {
     };
 
 
-    // ================== COMPOSER STATE ==================
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
     const [sending, setSending] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
 
-    // ================== REFERENCES ==================
     const inputRef = useRef(null);
     const sendingRef = useRef(false);
     const requestIdRef = useRef(null);
@@ -102,7 +91,6 @@ function ChatDashboard() {
     const firstName =
         user?.name?.trim().split(/\s+/)[0] || "there";
 
-    // ================== CLEANUP UPLOAD ==================
     useEffect(() => {
         return () => {
             uploadControllerRef.current?.abort();
@@ -110,7 +98,6 @@ function ChatDashboard() {
         };
     }, []);
 
-    // ================== MESSAGE INPUT ==================
     const handleMessageChange = (event) => {
         if (requestSignIn() || sendingRef.current) return;
 
@@ -118,7 +105,6 @@ function ChatDashboard() {
         requestIdRef.current = null;
     };
 
-    // ================== ATTACHMENTS ==================
     const handleAttachmentsChange = (files) => {
         if (requestSignIn() || sendingRef.current) return;
 
@@ -126,7 +112,6 @@ function ChatDashboard() {
         requestIdRef.current = null;
     };
 
-    // ================== STARTER PROMPT ==================
     const handleStarterPrompt = (prompt) => {
         if (requestSignIn() || sendingRef.current) return;
 
@@ -136,12 +121,10 @@ function ChatDashboard() {
         inputRef.current?.focus();
     };
 
-    // ================== CANCEL UPLOAD ==================
     const handleCancelUpload = () => {
         uploadControllerRef.current?.abort();
     };
 
-    // ================== NAVIGATE TO CONVERSATION ==================
     const openConversation = (
         conversationId,
         initialMessageId = null
@@ -156,7 +139,6 @@ function ChatDashboard() {
         });
     };
 
-    // ================== CREATE NORMAL CHAT ==================
     const createNormalChat = async (
         content,
         clientRequestId
@@ -194,20 +176,17 @@ function ChatDashboard() {
             return;
         }
 
-        // ================== START AI GENERATION ==================
         openConversation(
             conversationId,
             initialMessageId
         );
     };
 
-    // ================== CREATE DOCUMENT CHAT ==================
     const createDocumentChat = async (
         files,
         content,
         clientRequestId
     ) => {
-        // ================== UPLOAD CONTROLLER ==================
         const controller = new AbortController();
 
         uploadControllerRef.current = controller;
@@ -216,7 +195,6 @@ function ChatDashboard() {
         let uploadedConversationId = null;
 
         try {
-            // ================== UPLOAD AND INDEX DOCUMENTS ==================
             const uploadResponse = await uploadDocuments(
                 files,
                 {
@@ -230,7 +208,6 @@ function ChatDashboard() {
                 }
             );
 
-            // ================== VERIFY CONVERSATION ==================
             uploadedConversationId =
                 uploadResponse?.conversationId ||
                 uploadResponse?.conversation?._id;
@@ -244,7 +221,6 @@ function ChatDashboard() {
                 );
             }
 
-            // ================== VERIFY DOCUMENTS ==================
             const documents = uploadResponse?.documents;
 
             if (
@@ -281,11 +257,9 @@ function ChatDashboard() {
                 );
             }
 
-            // ================== UPLOAD COMPLETED ==================
             setUploadProgress(null);
             uploadControllerRef.current = null;
 
-            // ================== SAVE USER MESSAGE ==================
             const messageResponse = await sendMessage(
                 uploadedConversationId,
                 content,
@@ -305,14 +279,11 @@ function ChatDashboard() {
                 );
             }
 
-            // ================== START AI GENERATION ==================
             openConversation(
                 uploadedConversationId,
                 savedMessageId
             );
-
         } catch (error) {
-            // ================== PRESERVE UPLOADED DOCUMENTS ==================
             if (uploadedConversationId) {
                 toast.error(
                     "Documents were uploaded, but the chat message could not be completed. Open the conversation and try again."
@@ -323,7 +294,6 @@ function ChatDashboard() {
             }
 
             throw error;
-
         } finally {
             if (uploadControllerRef.current === controller) {
                 uploadControllerRef.current = null;
@@ -333,7 +303,6 @@ function ChatDashboard() {
         }
     };
 
-    // ================== SEND MESSAGE ==================
     const handleSubmit = async (event) => {
         event.preventDefault();
 
@@ -353,7 +322,6 @@ function ChatDashboard() {
             return;
         }
 
-        // ================== FILE-ONLY MESSAGE ==================
         const finalContent = content ||
             "Please summarize the attached document(s).";
 
@@ -361,7 +329,6 @@ function ChatDashboard() {
         setSending(true);
 
         try {
-            // ================== IDEMPOTENT REQUEST ID ==================
             if (!requestIdRef.current) {
                 requestIdRef.current =
                     generateChatRequestId();
@@ -370,7 +337,6 @@ function ChatDashboard() {
             const clientRequestId =
                 requestIdRef.current;
 
-            // ================== DOCUMENT OR NORMAL CHAT ==================
             if (selectedFiles.length) {
                 await createDocumentChat(
                     selectedFiles,
@@ -383,7 +349,6 @@ function ChatDashboard() {
                     clientRequestId
                 );
             }
-
         } catch (error) {
             const cancelled =
                 error?.name === "AbortError" ||
@@ -402,22 +367,15 @@ function ChatDashboard() {
                     )
                 );
             }
-
         } finally {
             sendingRef.current = false;
             setSending(false);
         }
     };
 
-    // ================== COMPONENT UI ==================
     return (
-        <section
-            className="chat-dashboard"
-            aria-labelledby="chat-dashboard-title"
-        >
+        <section className="chat-dashboard" aria-labelledby="chat-dashboard-title">
             <div className="chat-dashboard-container">
-
-                {/* ================== WELCOME ================== */}
                 <div className="chat-dashboard-welcome">
                     <h1 id="chat-dashboard-title">
                         What can I help you with,
@@ -429,12 +387,7 @@ function ChatDashboard() {
                         and work smarter with QueryNest AI.
                     </p>
                 </div>
-
-                {/* ================== STARTER CARDS ================== */}
-                <div
-                    className="chat-starter-grid"
-                    aria-label="Suggested prompts"
-                >
+                <div className="chat-starter-grid" aria-label="Suggested prompts">
                     {starterPrompts.map((item) => (
                         <button
                             key={item.title}
@@ -445,10 +398,7 @@ function ChatDashboard() {
                             }
                             disabled={sending}
                         >
-                            <span
-                                className="chat-starter-icon"
-                                aria-hidden="true"
-                            >
+                            <span className="chat-starter-icon" aria-hidden="true">
                                 <i className={item.icon} />
                             </span>
 
@@ -457,19 +407,11 @@ function ChatDashboard() {
                                 <small>{item.description}</small>
                             </span>
 
-                            <i
-                                className="fa-solid fa-arrow-up-right-from-square chat-starter-arrow"
-                                aria-hidden="true"
-                            />
+                            <i className="fa-solid fa-arrow-up-right-from-square chat-starter-arrow" aria-hidden="true" />
                         </button>
                     ))}
                 </div>
-
-                {/* ================== MESSAGE COMPOSER ================== */}
-                <div
-                    style={{ width: "100%" }}
-                    onClickCapture={handleComposerClickCapture}
-                >
+                <div className="qn-dashboard-composer-wrapper" onClickCapture={handleComposerClickCapture}>
                     <MessageComposer
                         inputId="new-chat-message"
                         inputRef={inputRef}
@@ -482,35 +424,20 @@ function ChatDashboard() {
                         sending={sending}
                     />
                 </div>
-
-                {/* ================== UPLOAD PROGRESS ================== */}
                 {uploadProgress !== null && (
-                    <div
-                        className="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3"
-                        role="status"
-                        aria-live="polite"
-                    >
+                    <div className="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3" role="status" aria-live="polite">
                         <span className="text-secondary small">
                             {uploadProgress < 100
                                 ? `Uploading documents: ${uploadProgress}%`
                                 : "Processing documents and generating embeddings..."}
                         </span>
 
-                        <button
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={handleCancelUpload}
-                        >
-                            <i
-                                className="fa-solid fa-xmark me-1"
-                                aria-hidden="true"
-                            />
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleCancelUpload}>
+                            <i className="fa-solid fa-xmark me-1" aria-hidden="true" />
                             Cancel Upload
                         </button>
                     </div>
                 )}
-
-                {/* ================== FOOTNOTE ================== */}
                 <p className="chat-dashboard-note">
                     QueryNest AI can make mistakes.
                     Verify important information.

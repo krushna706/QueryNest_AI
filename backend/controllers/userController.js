@@ -1,4 +1,3 @@
-
 const { randomUUID } = require("node:crypto");
 const cloudinary = require("cloudinary").v2;
 
@@ -6,6 +5,22 @@ const User = require("../models/User");
 
 const ExpressError = require("../utils/ExpressError");
 const { deleteAllUserChats } = require("../services/deletionService");
+
+// ================== USER RESPONSE ==================
+function getUserResponse(user) {
+    return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        createdAt: user.createdAt,
+        avatar: {
+            url: user.avatar?.url || "",
+        },
+    };
+}
 
 // ================== PROFILE CONFIGURATION ==================
 const MAX_AVATAR_SIZE = 3 * 1024 * 1024;
@@ -34,23 +49,6 @@ function configureCloudinary() {
         api_secret: apiSecret,
         secure: true,
     });
-}
-
-// ================== SAFE USER RESPONSE ==================
-function getUserResponse(user) {
-    return {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-        createdAt: user.createdAt,
-
-        avatar: {
-            url: user.avatar?.url || "",
-        },
-    };
 }
 
 // ================== GET PROFILE ==================
@@ -88,7 +86,6 @@ async function updateProfile(req, res, next) {
     try {
         const payload = req.body;
 
-        // ================== EDITABLE FIELD ALLOWLIST ==================
         if (
             !payload ||
             typeof payload !== "object" ||
@@ -109,12 +106,10 @@ async function updateProfile(req, res, next) {
             );
         }
 
-        // ================== NORMALIZE NAME ==================
         const name = payload.name
             .trim()
             .replace(/\s+/g, " ");
 
-        // ================== VALIDATE NAME ==================
         if (
             name.length < 2 ||
             name.length > 100 ||
@@ -126,7 +121,6 @@ async function updateProfile(req, res, next) {
             );
         }
 
-        // ================== UPDATE ACCOUNT ==================
         const user = await User.findOneAndUpdate(
             {
                 _id: req.user._id,
@@ -151,7 +145,6 @@ async function updateProfile(req, res, next) {
             );
         }
 
-        // ================== RESPONSE ==================
         res.set("Cache-Control", "no-store");
 
         return res.status(200).json({
@@ -177,7 +170,6 @@ async function validateAvatar(file) {
         );
     }
 
-    // ================== FILE SIZE ==================
     if (
         file.size <= 0 ||
         file.size > MAX_AVATAR_SIZE
@@ -188,7 +180,6 @@ async function validateAvatar(file) {
         );
     }
 
-    // ================== EXTENSION ==================
     const extension = String(
         file.originalname || ""
     )
@@ -196,7 +187,6 @@ async function validateAvatar(file) {
         .pop()
         .toLowerCase();
 
-    // ================== DETECT REAL FILE TYPE ==================
     const { fileTypeFromBuffer } = await import(
         "file-type"
     );
@@ -281,12 +271,10 @@ async function uploadAvatar(req, res, next) {
     let avatarSaved = false;
 
     try {
-        // ================== VALIDATE IMAGE ==================
         await validateAvatar(req.file);
 
         configureCloudinary();
 
-        // ================== FETCH EXISTING PROFILE ==================
         const existingUser = await User.findOne({
             _id: req.user._id,
             role: "user",
@@ -303,7 +291,6 @@ async function uploadAvatar(req, res, next) {
         const oldPublicId =
             existingUser.avatar?.publicId || "";
 
-        // ================== UPLOAD NEW IMAGE ==================
         const uploaded = await uploadToCloudinary(
             req.file.buffer
         );
@@ -322,7 +309,6 @@ async function uploadAvatar(req, res, next) {
             );
         }
 
-        // ================== PREVENT CONCURRENT REPLACEMENT ==================
         const avatarCondition = oldPublicId
             ? {
                 "avatar.publicId": oldPublicId,
@@ -340,7 +326,6 @@ async function uploadAvatar(req, res, next) {
                 ],
             };
 
-        // ================== SAVE NEW AVATAR ==================
         const updatedUser = await User.findOneAndUpdate(
             {
                 _id: req.user._id,
@@ -371,7 +356,6 @@ async function uploadAvatar(req, res, next) {
 
         avatarSaved = true;
 
-        // ================== DELETE PREVIOUS IMAGE ==================
         if (
             oldPublicId &&
             oldPublicId !== newPublicId
@@ -389,7 +373,6 @@ async function uploadAvatar(req, res, next) {
             }
         }
 
-        // ================== RESPONSE ==================
         res.set("Cache-Control", "no-store");
 
         return res.status(200).json({
@@ -403,7 +386,6 @@ async function uploadAvatar(req, res, next) {
         });
 
     } catch (error) {
-        // ================== CLEAN FAILED UPLOAD ==================
         if (
             newPublicId &&
             !avatarSaved

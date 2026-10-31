@@ -1,25 +1,9 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    IconButton,
-    Menu,
-    MenuItem,
-    TextField,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Menu, MenuItem, TextField } from "@mui/material";
 import { toast } from "react-toastify";
 
-import {
-    getChatHistory,
-    renameConversation,
-    deleteConversation,
-} from "../../services/chatService";
+import { getChatHistory, renameConversation, deleteConversation } from "../../services/chatService";
 
 // ================== CONFIGURATION ==================
 const HISTORY_LIMIT = 20;
@@ -100,7 +84,6 @@ function ChatHistory({
         [conversations]
     );
 
-    // ================== SEARCH DEBOUNCE ==================
     useEffect(() => {
         const timeout = setTimeout(() => {
             setDebouncedSearch(search.trim());
@@ -109,7 +92,6 @@ function ChatHistory({
         return () => clearTimeout(timeout);
     }, [search]);
 
-    // ================== LOAD HISTORY ==================
     useEffect(() => {
         let active = true;
 
@@ -154,7 +136,6 @@ function ChatHistory({
         };
     }, [debouncedSearch, location.pathname, refreshKey]);
 
-    // ================== LOAD MORE ==================
     const handleLoadMore = async () => {
         if (
             loading ||
@@ -202,7 +183,6 @@ function ChatHistory({
         }
     };
 
-    // ================== ACTION MENU ==================
     const handleOpenMenu = (event, conversation) => {
         setMenuAnchor(event.currentTarget);
         setSelectedConversation(conversation);
@@ -212,7 +192,6 @@ function ChatHistory({
         setMenuAnchor(null);
     };
 
-    // ================== RENAME DIALOG ==================
     const handleOpenRename = () => {
         if (!selectedConversation) return;
 
@@ -229,7 +208,6 @@ function ChatHistory({
         setTitle("");
     };
 
-    // ================== RENAME CONVERSATION ==================
     const handleRename = async (event) => {
         event.preventDefault();
 
@@ -280,7 +258,6 @@ function ChatHistory({
         }
     };
 
-    // ================== DELETE DIALOG ==================
     const handleOpenDelete = () => {
         if (!selectedConversation) return;
 
@@ -295,7 +272,6 @@ function ChatHistory({
         setSelectedConversation(null);
     };
 
-    // ================== DELETE CONVERSATION ==================
     const handleDelete = async () => {
         if (saving || !selectedConversation) return;
 
@@ -334,39 +310,21 @@ function ChatHistory({
 
     return (
         <div className="chat-history">
-
-            {/* ================== LOADING ================== */}
             {loading && (
-                <div
-                    className="chat-history-feedback"
-                    role="status"
-                >
-                    <i
-                        className="fa-solid fa-spinner fa-spin"
-                        aria-hidden="true"
-                    />
+                <div className="chat-history-feedback" role="status">
+                    <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
                     <span>Loading conversations...</span>
                 </div>
             )}
-
-            {/* ================== ERROR ================== */}
             {!loading && error && (
                 <div className="chat-history-feedback">
                     <p>{error}</p>
 
-                    <button
-                        type="button"
-                        className="chat-history-retry"
-                        onClick={() =>
-                            setRefreshKey((current) => current + 1)
-                        }
-                    >
+                    <button type="button" className="chat-history-retry" onClick={() => setRefreshKey((current) => current + 1) }>
                         Try Again
                     </button>
                 </div>
             )}
-
-            {/* ================== EMPTY HISTORY ================== */}
             {!loading && !error && conversations.length === 0 && (
                 <p className="chat-sidebar-empty">
                     {debouncedSearch
@@ -374,26 +332,18 @@ function ChatHistory({
                         : "Your conversations will appear here."}
                 </p>
             )}
-
-            {/* ================== CONVERSATION GROUPS ================== */}
             {!loading && !error && Object.entries(
                 groupedHistory
             ).map(([groupName, items]) => (
                 items.length > 0 && (
-                    <div
-                        key={groupName}
-                        className="chat-history-group"
-                    >
+                    <div key={groupName} className="chat-history-group">
                         <h2 className="chat-history-group-title">
                             {groupName}
                         </h2>
 
                         <ul className="chat-history-items">
                             {items.map((conversation) => (
-                                <li
-                                    key={conversation._id}
-                                    className="chat-history-item"
-                                >
+                                <li key={conversation._id} className="chat-history-item">
                                     <NavLink
                                         to={`/chat/${conversation._id}`}
                                         className={({ isActive }) =>
@@ -406,10 +356,7 @@ function ChatHistory({
                                         onClick={onClose}
                                         title={conversation.title}
                                     >
-                                        <i
-                                            className="fa-regular fa-message"
-                                            aria-hidden="true"
-                                        />
+                                        <i className="fa-regular fa-message" aria-hidden="true" />
 
                                         <span>
                                             {conversation.title}
@@ -429,10 +376,7 @@ function ChatHistory({
                                             )
                                         }
                                     >
-                                        <i
-                                            className="fa-solid fa-ellipsis"
-                                            aria-hidden="true"
-                                        />
+                                        <i className="fa-solid fa-ellipsis" aria-hidden="true" />
                                     </IconButton>
                                 </li>
                             ))}
@@ -440,21 +384,11 @@ function ChatHistory({
                     </div>
                 )
             ))}
-
-            {/* ================== LOAD MORE ================== */}
             {!loading && !error && hasMore && (
-                <button
-                    type="button"
-                    className="chat-history-load-more"
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                >
+                <button type="button" className="chat-history-load-more" onClick={handleLoadMore} disabled={loadingMore}>
                     {loadingMore ? (
                         <>
-                            <i
-                                className="fa-solid fa-spinner fa-spin"
-                                aria-hidden="true"
-                            />
+                            <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
                             Loading...
                         </>
                     ) : (
@@ -462,8 +396,6 @@ function ChatHistory({
                     )}
                 </button>
             )}
-
-            {/* ================== ACTION MENU ================== */}
             <Menu
                 anchorEl={menuAnchor}
                 open={Boolean(menuAnchor)}
@@ -474,37 +406,17 @@ function ChatHistory({
                     },
                 }}
             >
-                <MenuItem
-                    className="chat-history-menu-item"
-                    onClick={handleOpenRename}
-                >
-                    <i
-                        className="fa-solid fa-pen"
-                        aria-hidden="true"
-                    />
+                <MenuItem className="chat-history-menu-item" onClick={handleOpenRename}>
+                    <i className="fa-solid fa-pen" aria-hidden="true" />
                     Rename
                 </MenuItem>
 
-                <MenuItem
-                    className="chat-history-menu-item chat-history-delete-item"
-                    onClick={handleOpenDelete}
-                >
-                    <i
-                        className="fa-regular fa-trash-can"
-                        aria-hidden="true"
-                    />
+                <MenuItem className="chat-history-menu-item chat-history-delete-item" onClick={handleOpenDelete}>
+                    <i className="fa-regular fa-trash-can" aria-hidden="true" />
                     Delete
                 </MenuItem>
             </Menu>
-
-            {/* ================== RENAME DIALOG ================== */}
-            <Dialog
-                open={renameOpen}
-                onClose={handleCloseRename}
-                fullWidth
-                maxWidth="xs"
-                aria-labelledby="rename-conversation-title"
-            >
+            <Dialog open={renameOpen} onClose={handleCloseRename} fullWidth maxWidth="xs" aria-labelledby="rename-conversation-title">
                 <form onSubmit={handleRename}>
                     <DialogTitle id="rename-conversation-title">
                         Rename Conversation
@@ -532,33 +444,17 @@ function ChatHistory({
                     </DialogContent>
 
                     <DialogActions>
-                        <Button
-                            type="button"
-                            onClick={handleCloseRename}
-                            disabled={saving}
-                        >
+                        <Button type="button" onClick={handleCloseRename} disabled={saving}>
                             Cancel
                         </Button>
 
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={!title.trim() || saving}
-                        >
+                        <Button type="submit" variant="contained" disabled={!title.trim() || saving}>
                             {saving ? "Saving..." : "Save"}
                         </Button>
                     </DialogActions>
                 </form>
             </Dialog>
-
-            {/* ================== DELETE DIALOG ================== */}
-            <Dialog
-                open={deleteOpen}
-                onClose={handleCloseDelete}
-                fullWidth
-                maxWidth="xs"
-                aria-labelledby="delete-conversation-title"
-            >
+            <Dialog open={deleteOpen} onClose={handleCloseDelete} fullWidth maxWidth="xs" aria-labelledby="delete-conversation-title">
                 <DialogTitle id="delete-conversation-title">
                     Delete Conversation?
                 </DialogTitle>
@@ -572,21 +468,11 @@ function ChatHistory({
                 </DialogContent>
 
                 <DialogActions>
-                    <Button
-                        type="button"
-                        onClick={handleCloseDelete}
-                        disabled={saving}
-                    >
+                    <Button type="button" onClick={handleCloseDelete} disabled={saving}>
                         Cancel
                     </Button>
 
-                    <Button
-                        type="button"
-                        color="error"
-                        variant="contained"
-                        onClick={handleDelete}
-                        disabled={saving}
-                    >
+                    <Button type="button" color="error" variant="contained" onClick={handleDelete} disabled={saving}>
                         {saving ? "Deleting..." : "Delete"}
                     </Button>
                 </DialogActions>

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, CircularProgress, IconButton, InputAdornment, TextField } from "@mui/material";
@@ -70,10 +69,7 @@ function PasswordVisibility({ visible, onToggle, label, disabled }) {
                 disabled={disabled}
                 edge="end"
             >
-                <i
-                    className={`fa-solid ${visible ? "fa-eye-slash" : "fa-eye"}`}
-                    aria-hidden="true"
-                />
+                <i className={`fa-solid ${visible ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
             </IconButton>
         </InputAdornment>
     );
@@ -84,7 +80,6 @@ function ForgotPassword() {
     const navigate = useNavigate();
     const submitLock = useRef(false);
 
-    // ================== FORM STATE ==================
     const [step, setStep] = useState(0);
     const [identifier, setIdentifier] = useState("");
     const [otp, setOtp] = useState("");
@@ -101,7 +96,6 @@ function ForgotPassword() {
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
 
-    // ================== RESEND COOLDOWN ==================
     const [resendAt, setResendAt] = useState(0);
     const [resendSeconds, setResendSeconds] = useState(0);
 
@@ -134,7 +128,6 @@ function ForgotPassword() {
         setResendSeconds(Math.ceil(safeSeconds));
     }
 
-    // ================== REQUEST OTP ==================
     async function requestOtp(isResend = false) {
         const normalized = identifier.trim().toLowerCase();
 
@@ -186,7 +179,6 @@ function ForgotPassword() {
         }
     }
 
-    // ================== VERIFY OTP ==================
     async function verifyOtp() {
         if (!/^\d{6}$/.test(otp)) {
             setError("Enter the complete 6-digit OTP.");
@@ -230,7 +222,6 @@ function ForgotPassword() {
         }
     }
 
-    // ================== RESET PASSWORD ==================
     async function resetPassword() {
         if (
             newPassword.length < 6 ||
@@ -288,7 +279,6 @@ function ForgotPassword() {
         }
     }
 
-    // ================== FORM SUBMISSION ==================
     function handleSubmit(event) {
         event.preventDefault();
 
@@ -305,7 +295,6 @@ function ForgotPassword() {
         }
     }
 
-    // ================== RESEND OTP ==================
     function handleResend() {
         if (step !== 1 || busy || resendSeconds > 0) {
             return;
@@ -314,7 +303,6 @@ function ForgotPassword() {
         requestOtp(true);
     }
 
-    // ================== RESTART RECOVERY ==================
     function restartRecovery() {
         if (busy) {
             return;
@@ -369,13 +357,7 @@ function ForgotPassword() {
                 </div>
             </div>
 
-            <form
-                className="auth-form"
-                onSubmit={handleSubmit}
-                aria-busy={busy}
-                noValidate
-            >
-                {/* ================== ACCOUNT IDENTIFIER ================== */}
+            <form className="auth-form" onSubmit={handleSubmit} aria-busy={busy} noValidate>
                 {step === 0 && (
                     <TextField
                         id="recovery-identifier"
@@ -402,8 +384,6 @@ function ForgotPassword() {
                         }}
                     />
                 )}
-
-                {/* ================== VERIFY EMAIL OTP ================== */}
                 {step === 1 && (
                     <>
                         <div className="auth-notice" role="status">
@@ -440,28 +420,18 @@ function ForgotPassword() {
                             }}
                         />
 
-                        <Button
-                            type="button"
-                            className="auth-restart"
-                            disabled={busy || resendSeconds > 0}
-                            onClick={handleResend}
-                        >
+                        <Button type="button" className="auth-restart" disabled={busy || resendSeconds > 0} onClick={handleResend}>
                             {resendSeconds > 0
                                 ? `Resend OTP in ${resendSeconds}s`
                                 : "Resend OTP"}
                         </Button>
                     </>
                 )}
-
-                {/* ================== NEW PASSWORD ================== */}
                 {step === 2 && (
                     <>
                         <div className="auth-recovery-question" role="status">
                             <span className="auth-feature-icon">
-                                <i
-                                    className="fa-solid fa-shield-halved"
-                                    aria-hidden="true"
-                                />
+                                <i className="fa-solid fa-shield-halved" aria-hidden="true" />
                             </span>
 
                             <div>
@@ -537,23 +507,12 @@ function ForgotPassword() {
                         />
                     </>
                 )}
-
-                {/* ================== ERROR MESSAGE ================== */}
                 {error && (
                     <div className="auth-notice" role="alert">
                         {error}
                     </div>
                 )}
-
-                {/* ================== SUBMIT BUTTON ================== */}
-                <Button
-                    type="submit"
-                    variant="contained"
-                    className="auth-submit"
-                    disabled={busy}
-                    disableElevation
-                    fullWidth
-                >
+                <Button type="submit" variant="contained" className="auth-submit" disabled={busy} disableElevation fullWidth>
                     {busy ? (
                         <>
                             <CircularProgress size={18} color="inherit" />
@@ -562,22 +521,12 @@ function ForgotPassword() {
                     ) : (
                         <>
                             {currentStep.button}
-                            <i
-                                className="fa-solid fa-arrow-right"
-                                aria-hidden="true"
-                            />
+                            <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                         </>
                     )}
                 </Button>
-
-                {/* ================== RESTART ================== */}
                 {step > 0 && (
-                    <Button
-                        type="button"
-                        className="auth-restart"
-                        onClick={restartRecovery}
-                        disabled={busy}
-                    >
+                    <Button type="button" className="auth-restart" onClick={restartRecovery} disabled={busy}>
                         Start Again
                     </Button>
                 )}

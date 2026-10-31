@@ -1,36 +1,15 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import {
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
-
-import {
-    Link,
-    useLocation,
-    useNavigate,
-    useParams,
-} from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { toast } from "react-toastify";
 
 import MessageComposer from "../components/chat/MessageComposer";
 import MessageList from "../components/chat/MessageList";
 
-import {
-    generateChatRequestId,
-    generateAIResponse,
-    getConversation,
-    getMessageHistory,
-    sendMessage,
-} from "../services/chatService";
+import { generateChatRequestId, generateAIResponse, getConversation, getMessageHistory, sendMessage } from "../services/chatService";
 
-import {
-    uploadDocuments,
-    getDocuments,
-} from "../services/documentService";
+import { uploadDocuments, getDocuments } from "../services/documentService";
 
 // ================== CONFIGURATION ==================
 const MESSAGE_LIMIT = 20;
@@ -93,7 +72,6 @@ function getFriendlyError(error, fallback) {
 
     const retryWait = getRetryWait(error);
 
-    // ================== AUTHENTICATION ==================
     if (status === 401 || code === "SESSION_EXPIRED") {
         return "Your session has expired. Please log in again.";
     }
@@ -106,7 +84,6 @@ function getFriendlyError(error, fallback) {
         return "This conversation or document is no longer available.";
     }
 
-    // ================== USER DAILY REQUEST LIMIT ==================
     if (
         code === "USER_DAILY_LIMIT" ||
         code === "DAILY_REQUEST_LIMIT" ||
@@ -119,7 +96,6 @@ function getFriendlyError(error, fallback) {
             retryWait;
     }
 
-    // ================== USER PER-MINUTE LIMIT ==================
     if (
         code === "USER_MINUTE_LIMIT" ||
         code === "MINUTE_REQUEST_LIMIT" ||
@@ -132,7 +108,6 @@ function getFriendlyError(error, fallback) {
             (retryWait || " Please try again shortly.");
     }
 
-    // ================== PROVIDER TOKEN LIMIT ==================
     if (
         code === "PROVIDER_QUOTA_EXCEEDED" ||
         code === "PROVIDER_TOKEN_LIMIT" ||
@@ -148,7 +123,6 @@ function getFriendlyError(error, fallback) {
             (retryWait || " Please try again later.");
     }
 
-    // ================== PROVIDER RATE LIMIT ==================
     if (
         code === "PROVIDER_RATE_LIMIT" ||
         (
@@ -160,7 +134,6 @@ function getFriendlyError(error, fallback) {
             (retryWait || " Please try again shortly.");
     }
 
-    // ================== DOCUMENT LIMIT ==================
     if (
         code === "DOCUMENT_LIMIT" ||
         code === "MAX_DOCUMENTS_EXCEEDED" ||
@@ -171,7 +144,6 @@ function getFriendlyError(error, fallback) {
         return "You can upload up to 3 documents per chat. Start a new chat to upload more.";
     }
 
-    // ================== FILE SIZE ==================
     if (
         code === "FILE_TOO_LARGE" ||
         (
@@ -186,7 +158,6 @@ function getFriendlyError(error, fallback) {
         return "This document or request is too large. Please try a smaller one.";
     }
 
-    // ================== DOCUMENT FORMAT ==================
     if (
         status === 415 ||
         code === "UNSUPPORTED_FILE_TYPE" ||
@@ -195,7 +166,6 @@ function getFriendlyError(error, fallback) {
         return "Please upload a valid PDF or Word document.";
     }
 
-    // ================== DOCUMENT EXTRACTION ==================
     if (
         code === "DOCUMENT_EXTRACTION_FAILED" ||
         details.includes("no readable text") ||
@@ -205,7 +175,6 @@ function getFriendlyError(error, fallback) {
         return "We couldn't read enough information from your document. Try another file or a more specific question.";
     }
 
-    // ================== REQUEST TIMEOUT ==================
     if (
         code === "REQUEST_TIMEOUT" ||
         code === "ECONNABORTED" ||
@@ -215,7 +184,6 @@ function getFriendlyError(error, fallback) {
         return "Your request took too long. Please try again.";
     }
 
-    // ================== NETWORK ERROR ==================
     if (
         code === "ERR_NETWORK" ||
         details.includes("failed to fetch") ||
@@ -228,7 +196,6 @@ function getFriendlyError(error, fallback) {
         return "Connection lost. Please check your internet and try again.";
     }
 
-    // ================== DUPLICATE GENERATION ==================
     if (
         details.includes("already in progress") ||
         details.includes("response already exists")
@@ -236,7 +203,6 @@ function getFriendlyError(error, fallback) {
         return "This response is already being generated or has been completed.";
     }
 
-    // ================== STREAM INTERRUPTED ==================
     if (
         [
             "STREAM_INTERRUPTED",
@@ -247,7 +213,6 @@ function getFriendlyError(error, fallback) {
         return "The AI response was interrupted. Please try again.";
     }
 
-    // ================== VERIFIED BACKEND VALIDATION ==================
     if (
         [
             "REQUEST_REJECTED",
@@ -270,18 +235,15 @@ function getFriendlyError(error, fallback) {
         return "This request couldn't be completed. Please refresh the conversation and try again.";
     }
 
-    // ================== REGENERATE CONFLICT ==================
     if (status === 409) {
         return "The response state has changed. Please refresh the conversation and try again.";
     }
 
-    // ================== GENERAL RATE LIMIT ==================
     if (status === 429) {
         return "Too many requests right now." +
             (retryWait || " Please try again later.");
     }
 
-    // ================== SERVER FAILURE ==================
     if (status >= 500) {
         return "The AI service is temporarily unavailable. Please try again.";
     }
@@ -323,7 +285,6 @@ function Conversation() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // ================== CHAT STATE ==================
     const [conversation, setConversation] = useState(null);
     const [messages, setMessages] = useState([]);
 
@@ -340,12 +301,10 @@ function Conversation() {
     const [queuePosition, setQueuePosition] = useState(null);
     const [error, setError] = useState("");
 
-    // ================== PAGINATION ==================
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState(null);
     const [reloadKey, setReloadKey] = useState(0);
 
-    // ================== REFERENCES ==================
     const messagesRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -364,7 +323,6 @@ function Conversation() {
 
     const conversationIdRef = useRef(conversationId);
 
-    // ================== CLEANUP REQUESTS ==================
     useEffect(() => {
         conversationIdRef.current = conversationId;
 
@@ -379,7 +337,6 @@ function Conversation() {
         };
     }, [conversationId]);
 
-    // ================== LOAD CONVERSATION ==================
     useEffect(() => {
         let active = true;
 
@@ -417,7 +374,6 @@ function Conversation() {
 
                 if (!active) return;
 
-                // ================== SAVE CHAT DETAILS ==================
                 setConversation(
                     conversationResponse.conversation
                 );
@@ -426,7 +382,6 @@ function Conversation() {
                     messageResponse.messages || []
                 );
 
-                // ================== PAGINATION ==================
                 setHasMore(
                     Boolean(messageResponse.pagination?.hasMore)
                 );
@@ -435,7 +390,6 @@ function Conversation() {
                     messageResponse.pagination?.nextCursor || null
                 );
 
-                // ================== DOCUMENT COUNT ==================
                 if (Array.isArray(documentResponse?.documents)) {
                     setDocumentCount(
                         documentResponse.documents.length
@@ -447,7 +401,6 @@ function Conversation() {
                         "We couldn't check your uploaded files. You can still continue chatting."
                     );
                 }
-
             } catch (loadError) {
                 if (!active) return;
 
@@ -458,7 +411,6 @@ function Conversation() {
 
                 setError(friendlyMessage);
                 showError(friendlyMessage);
-
             } finally {
                 if (active) {
                     setLoading(false);
@@ -473,7 +425,6 @@ function Conversation() {
         };
     }, [conversationId, reloadKey]);
 
-    // ================== RESET DRAFT ==================
     useEffect(() => {
         setMessage("");
         setAttachments([]);
@@ -484,7 +435,6 @@ function Conversation() {
         autoStartedRef.current = null;
     }, [conversationId]);
 
-    // ================== USER VISIBLE MESSAGES ==================
     const visibleMessages = useMemo(() => {
         return messages.map((item) => {
             if (item.role !== "assistant") {
@@ -499,7 +449,6 @@ function Conversation() {
         });
     }, [messages]);
 
-    // ================== SCROLL MANAGEMENT ==================
     useLayoutEffect(() => {
         const container = messagesRef.current;
 
@@ -521,7 +470,6 @@ function Conversation() {
         }
     }, [messages]);
 
-    // ================== SCROLL POSITION ==================
     function markScrollIfNearBottom() {
         const container = messagesRef.current;
 
@@ -532,7 +480,6 @@ function Conversation() {
                 container.clientHeight < 110;
     }
 
-    // ================== LOAD EARLIER MESSAGES ==================
     async function handleLoadMore() {
         if (
             !hasMore ||
@@ -573,7 +520,6 @@ function Conversation() {
                 };
             }
 
-            // ================== MERGE HISTORY ==================
             setMessages((current) => {
                 const existingIds = new Set(
                     current.map((item) => item._id)
@@ -593,7 +539,6 @@ function Conversation() {
             setNextCursor(
                 response.pagination?.nextCursor || null
             );
-
         } catch (loadError) {
             if (
                 conversationIdRef.current ===
@@ -606,7 +551,6 @@ function Conversation() {
                     )
                 );
             }
-
         } finally {
             if (
                 conversationIdRef.current ===
@@ -617,7 +561,6 @@ function Conversation() {
         }
     }
 
-    // ================== AI STREAM ==================
     async function runAIStream(
         userMessageId,
         { regenerate = false } = {}
@@ -650,7 +593,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== REQUEST QUEUED ==================
                         if (type === "queued") {
                             setQueuePosition(
                                 data?.position || 1
@@ -658,7 +600,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== RESPONSE START ==================
                         if (
                             type === "start" &&
                             data?.messageId
@@ -706,7 +647,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== AI PROVIDER ==================
                         if (
                             type === "provider" &&
                             assistantMessageId
@@ -729,7 +669,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== INTERNAL SOURCES ==================
                         if (
                             type === "sources" &&
                             assistantMessageId
@@ -754,7 +693,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== STREAM TEXT ==================
                         if (
                             type === "delta" &&
                             assistantMessageId
@@ -785,7 +723,6 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== STREAM DONE ==================
                         if (
                             type === "done" &&
                             assistantMessageId
@@ -821,11 +758,9 @@ function Conversation() {
                     },
                 }
             );
-
         } catch (streamError) {
             const stopped = controller.signal.aborted;
 
-            // ================== UPDATE RESPONSE STATUS ==================
             if (
                 assistantMessageId &&
                 conversationIdRef.current === activeConversationId
@@ -847,7 +782,6 @@ function Conversation() {
                 );
             }
 
-            // ================== SHOW VERIFIED ERROR ==================
             if (
                 !stopped &&
                 conversationIdRef.current === activeConversationId
@@ -861,7 +795,6 @@ function Conversation() {
                     )
                 );
             }
-
         } finally {
             if (
                 streamControllerRef.current === controller
@@ -872,7 +805,6 @@ function Conversation() {
         }
     }
 
-    // ================== MESSAGE INPUT ==================
     function handleMessageChange(event) {
         if (busyRef.current) return;
 
@@ -882,7 +814,6 @@ function Conversation() {
         pendingUploadRef.current = null;
     }
 
-    // ================== ATTACHMENTS ==================
     function handleAttachmentsChange(files) {
         if (busyRef.current) return;
 
@@ -892,7 +823,6 @@ function Conversation() {
         pendingUploadRef.current = null;
     }
 
-    // ================== CANCEL ACTIVE REQUEST ==================
     function handleStopRequest() {
         if (uploadControllerRef.current) {
             uploadControllerRef.current.abort();
@@ -902,7 +832,6 @@ function Conversation() {
         streamControllerRef.current?.abort();
     }
 
-    // ================== SEND MESSAGE ==================
     async function handleSubmit(event) {
         event.preventDefault();
 
@@ -925,7 +854,6 @@ function Conversation() {
 
         if (!content) return;
 
-        // ================== DOCUMENT LIMIT ==================
         if (
             selectedFiles.length &&
             documentCount !== null &&
@@ -944,7 +872,6 @@ function Conversation() {
         setSending(true);
 
         try {
-            // ================== REQUEST IDENTIFIER ==================
             if (!requestIdRef.current) {
                 requestIdRef.current =
                     generateChatRequestId();
@@ -953,13 +880,11 @@ function Conversation() {
             const clientRequestId =
                 requestIdRef.current;
 
-            // ================== PREVIOUS SUCCESSFUL UPLOAD ==================
             let messageAttachmentIds =
                 pendingUploadRef.current?.content === content
                     ? pendingUploadRef.current.documentIds
                     : [];
 
-            // ================== UPLOAD NEW FILES ==================
             if (selectedFiles.length) {
                 const controller = new AbortController();
 
@@ -990,7 +915,6 @@ function Conversation() {
                                 },
                         }
                     );
-
                 } finally {
                     if (
                         uploadControllerRef.current === controller
@@ -1008,7 +932,6 @@ function Conversation() {
                     return;
                 }
 
-                // ================== VERIFY UPLOADED DOCUMENTS ==================
                 const newDocuments = uploaded?.documents || [];
 
                 const newIds = newDocuments.map(
@@ -1029,7 +952,6 @@ function Conversation() {
                     );
                 }
 
-                // ================== PRESERVE UPLOAD FOR RETRY ==================
                 messageAttachmentIds = newIds;
 
                 pendingUploadRef.current = {
@@ -1054,7 +976,6 @@ function Conversation() {
                 return;
             }
 
-            // ================== SAVE USER MESSAGE ==================
             const response = await sendMessage(
                 activeConversationId,
                 content,
@@ -1078,7 +999,6 @@ function Conversation() {
                 return;
             }
 
-            // ================== UPDATE MESSAGE HISTORY ==================
             scrollToBottomRef.current = true;
 
             setMessages((current) => {
@@ -1094,16 +1014,13 @@ function Conversation() {
                 return [...current, savedMessage];
             });
 
-            // ================== CLEAR COMPOSER ==================
             setMessage("");
             setAttachments([]);
 
             requestIdRef.current = null;
             pendingUploadRef.current = null;
 
-            // ================== GENERATE AI RESPONSE ==================
             await runAIStream(savedMessage._id);
-
         } catch (sendError) {
             if (
                 conversationIdRef.current ===
@@ -1113,7 +1030,6 @@ function Conversation() {
                     showInfo(
                         "Document upload cancelled."
                     );
-
                 } else {
                     showError(
                         getFriendlyError(
@@ -1123,7 +1039,6 @@ function Conversation() {
                     );
                 }
             }
-
         } finally {
             if (
                 conversationIdRef.current ===
@@ -1137,7 +1052,6 @@ function Conversation() {
         }
     }
 
-    // ================== GENERATE / RETRY / REGENERATE ==================
     async function handleGenerateSavedMessage(
         userMessageId,
         { regenerate = false } = {}
@@ -1154,7 +1068,6 @@ function Conversation() {
                 userMessageId,
                 { regenerate }
             );
-
         } finally {
             if (
                 conversationIdRef.current ===
@@ -1168,7 +1081,6 @@ function Conversation() {
         }
     }
 
-    // ================== COMPACT REGENERATE ==================
     function handleRegenerate(userMessageId) {
         void handleGenerateSavedMessage(
             userMessageId,
@@ -1176,7 +1088,6 @@ function Conversation() {
         );
     }
 
-    // ================== COMPACT RETRY ==================
     function handleRetry(userMessageId) {
         void handleGenerateSavedMessage(
             userMessageId,
@@ -1184,7 +1095,6 @@ function Conversation() {
         );
     }
 
-    // ================== INITIAL CHAT HANDOFF ==================
     useEffect(() => {
         const pendingId =
             location.state?.autoGenerateMessageId;
@@ -1234,7 +1144,6 @@ function Conversation() {
         if (!existingReply) {
             void handleGenerateSavedMessage(pendingId);
         }
-
     }, [
         conversationId,
         conversation,
@@ -1246,14 +1155,12 @@ function Conversation() {
         navigate,
     ]);
 
-    // ================== LATEST USER MESSAGE ==================
     const lastUserMessage = [...messages]
         .reverse()
         .find(
             (item) => item.role === "user"
         );
 
-    // ================== LATEST AI RESPONSE ==================
     const lastReply = lastUserMessage
         ? [...messages]
             .reverse()
@@ -1265,7 +1172,6 @@ function Conversation() {
             )
         : null;
 
-    // ================== MISSING RESPONSE ==================
     const canGenerateMissingReply = Boolean(
         lastUserMessage &&
         !lastReply &&
@@ -1273,31 +1179,20 @@ function Conversation() {
         !loading
     );
 
-    // ================== LOADING SCREEN ==================
     if (loading) {
         return (
-            <div
-                className="conversation-feedback"
-                role="status"
-            >
-                <i
-                    className="fa-solid fa-spinner fa-spin"
-                    aria-hidden="true"
-                />
+            <div className="conversation-feedback" role="status">
+                <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
 
                 <p>Loading conversation...</p>
             </div>
         );
     }
 
-    // ================== ERROR SCREEN ==================
     if (error || !conversation) {
         return (
             <div className="conversation-feedback">
-                <i
-                    className="fa-regular fa-circle-xmark"
-                    aria-hidden="true"
-                />
+                <i className="fa-regular fa-circle-xmark" aria-hidden="true" />
 
                 <h2>Conversation unavailable</h2>
 
@@ -1306,61 +1201,24 @@ function Conversation() {
                         "This conversation is unavailable."}
                 </p>
 
-                <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() =>
-                        setReloadKey(
-                            (current) => current + 1
-                        )
-                    }
-                >
+                <button type="button" className="btn btn-primary" onClick={() => setReloadKey( (current) => current + 1 ) }>
                     Try Again
                 </button>
 
-                <Link
-                    to="/chat"
-                    className="btn btn-link"
-                >
+                <Link to="/chat" className="btn btn-link">
                     New Chat
                 </Link>
             </div>
         );
     }
 
-    // ================== CHAT INTERFACE ==================
     return (
-        <section
-            className="conversation-page"
-            aria-labelledby="conversation-title"
-        >
-            <h1
-                id="conversation-title"
-                className="visually-hidden"
-            >
+        <section className="conversation-page" aria-labelledby="conversation-title">
+            <h1 id="conversation-title" className="visually-hidden">
                 {conversation.title}
             </h1>
-
-            {/* ================== MESSAGE HISTORY ================== */}
-            <div
-                ref={messagesRef}
-                className="conversation-messages"
-                role="log"
-                aria-label="Conversation messages"
-                style={{
-                    padding:
-                        "26px clamp(12px, 3vw, 28px) 20px",
-                }}
-            >
-                <div
-                    style={{
-                        width: "100%",
-                        maxWidth: CHAT_MAX_WIDTH,
-                        margin: "0 auto",
-                        minWidth: 0,
-                    }}
-                >
-                    {/* ================== CHAT MESSAGES ================== */}
+            <div ref={messagesRef} className="conversation-messages qn-conversation-scroll" role="log" aria-label="Conversation messages">
+                <div className="qn-conversation-content-width">
                     <MessageList
                         messages={visibleMessages}
                         hasMore={hasMore}
@@ -1370,30 +1228,18 @@ function Conversation() {
                         onRetry={handleRetry}
                         actionsDisabled={sending || loading}
                     />
-
-                    {/* ================== NO RESPONSE FALLBACK ================== */}
                     {canGenerateMissingReply && (
-                        <div
-                            className="d-flex justify-content-start mt-3"
-                        >
+                        <div className="d-flex justify-content-start mt-3">
                             <button
                                 type="button"
-                                className="btn btn-sm btn-outline-secondary"
+                                className="btn btn-sm btn-outline-secondary qn-conversation-generate-button"
                                 onClick={() =>
                                     handleGenerateSavedMessage(
                                         lastUserMessage._id
                                     )
                                 }
-                                style={{
-                                    fontSize: 11,
-                                    padding: "5px 10px",
-                                    borderRadius: 7,
-                                }}
                             >
-                                <i
-                                    className="fa-solid fa-rotate-right me-2"
-                                    aria-hidden="true"
-                                />
+                                <i className="fa-solid fa-rotate-right me-2" aria-hidden="true" />
 
                                 Generate Response
                             </button>
@@ -1401,52 +1247,24 @@ function Conversation() {
                     )}
                 </div>
             </div>
-
-            {/* ================== COMPACT COMPOSER ================== */}
-            <div
-                className="conversation-composer-wrap"
-                style={{
-                    padding:
-                        "10px clamp(12px, 3vw, 28px) 14px",
-                }}
-            >
-                <div
-                    style={{
-                        width: "100%",
-                        maxWidth: CHAT_MAX_WIDTH,
-                        margin: "0 auto",
-                    }}
-                >
-                    {/* ================== UPLOAD PROGRESS ================== */}
+            <div className="conversation-composer-wrap qn-conversation-composer-area">
+                <div className="qn-conversation-composer-width">
                     {uploadProgress !== null && (
-                        <div
-                            className="d-flex align-items-center justify-content-between gap-3 mb-2 px-2"
-                            role="status"
-                            aria-live="polite"
-                        >
+                        <div className="d-flex align-items-center justify-content-between gap-3 mb-2 px-2" role="status" aria-live="polite">
                             <span className="small text-secondary">
                                 {uploadProgress < 100
                                     ? `Uploading: ${uploadProgress}%`
                                     : "Processing your document..."}
                             </span>
 
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-link text-secondary p-0"
-                                onClick={handleStopRequest}
-                            >
+                            <button type="button" className="btn btn-sm btn-link text-secondary p-0" onClick={handleStopRequest}>
                                 Cancel
                             </button>
                         </div>
                     )}
-
-                    {/* ================== STREAMING CONTROLS ================== */}
                     {sending &&
                         uploadProgress === null && (
-                            <div
-                                className="d-flex justify-content-center mb-2"
-                                role="status"
-                            >
+                            <div className="d-flex justify-content-center mb-2" role="status">
                                 {queuePosition && (
                                     <span className="small text-secondary me-3">
                                         Waiting in queue:
@@ -1456,23 +1274,14 @@ function Conversation() {
                                 )}
 
                                 {streamControllerRef.current && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline-secondary"
-                                        onClick={handleStopRequest}
-                                    >
-                                        <i
-                                            className="fa-solid fa-stop me-1"
-                                            aria-hidden="true"
-                                        />
+                                    <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleStopRequest}>
+                                        <i className="fa-solid fa-stop me-1" aria-hidden="true" />
 
                                         Stop Generating
                                     </button>
                                 )}
                             </div>
                         )}
-
-                    {/* ================== MESSAGE COMPOSER ================== */}
                     <MessageComposer
                         inputId="conversation-message"
                         inputRef={inputRef}
@@ -1486,16 +1295,7 @@ function Conversation() {
                         placeholder="Message QueryNest AI..."
                         sending={sending}
                     />
-
-                    {/* ================== DISCLAIMER ================== */}
-                    <p
-                        className="chat-dashboard-note"
-                        style={{
-                            marginTop: 8,
-                            marginBottom: 0,
-                            textAlign: "center",
-                        }}
-                    >
+                    <p className="chat-dashboard-note qn-conversation-disclaimer">
                         QueryNest AI can make mistakes.
                         Verify important information.
                     </p>

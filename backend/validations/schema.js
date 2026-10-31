@@ -254,6 +254,40 @@ const conversationParamsSchema = Joi.object({
     .required()
     .unknown(false);
 
+// ================== DOCUMENT ID PARAMS ==================
+const deleteDocumentParamsSchema = conversationParamsSchema.keys({
+    documentId: Joi.string()
+        .hex()
+        .length(24)
+        .required()
+        .messages({
+            "string.hex": "Invalid document ID.",
+            "string.length": "Invalid document ID.",
+            "any.required": "Document ID is required.",
+        }),
+}).unknown(false);
+
+
+// ================== PROFILE NAME VALIDATION ==================
+const updateProfileSchema = Joi.object({
+    name: Joi.string()
+        .trim()
+        .min(2)
+        .max(100)
+        .pattern(/^[^\u0000-\u001F\u007F]+$/)
+        .required()
+        .messages({
+            "string.empty": "Name is required.",
+            "string.min": "Name must contain at least 2 characters.",
+            "string.max": "Name cannot exceed 100 characters.",
+            "string.pattern.base": "Enter a valid name.",
+            "any.required": "Name is required.",
+        }),
+})
+    .required()
+    .unknown(false);
+
+
 // ================== CHAT HISTORY QUERY ==================
 const chatHistoryQuerySchema = Joi.object({
     search: Joi.string()
@@ -304,6 +338,8 @@ module.exports = {
     renameConversationSchema,
 
     conversationParamsSchema,
+    deleteDocumentParamsSchema,
+    updateProfileSchema,
     chatHistoryQuerySchema,
     messageHistoryQuerySchema,
 };

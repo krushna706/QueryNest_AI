@@ -1,9 +1,4 @@
-
-import {
-    useCallback,
-    useLayoutEffect,
-    useRef,
-} from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 
 import { toast } from "react-toastify";
 
@@ -49,11 +44,9 @@ function MessageComposer({
     placeholder = "Message QueryNest AI...",
     sending = false,
 }) {
-    // ================== REFERENCES ==================
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // ================== CURRENT MESSAGE ==================
     const messageText =
         typeof value === "string" ? value : "";
 
@@ -72,14 +65,12 @@ function MessageComposer({
         !sending &&
         selectedFiles.length < MAX_FILES;
 
-    // ================== CONNECT TEXTAREA REF ==================
     const setTextareaRef = useCallback(
         (element) => {
             textareaRef.current = element;
 
             if (typeof inputRef === "function") {
                 inputRef(element);
-
             } else if (inputRef) {
                 inputRef.current = element;
             }
@@ -87,7 +78,6 @@ function MessageComposer({
         [inputRef]
     );
 
-    // ================== AUTO RESIZE TEXTAREA ==================
     useLayoutEffect(() => {
         const textarea = textareaRef.current;
 
@@ -112,10 +102,8 @@ function MessageComposer({
             contentHeight > MAX_TEXTAREA_HEIGHT
                 ? "auto"
                 : "hidden";
-
     }, [messageText]);
 
-    // ================== SELECT FILES ==================
     function handleFileSelect(event) {
         const files = Array.from(
             event.target.files || []
@@ -130,14 +118,12 @@ function MessageComposer({
 
         const updatedFiles = [...selectedFiles];
 
-        // ================== VALIDATE EACH FILE ==================
         for (const file of files) {
             const extension = file.name
                 .split(".")
                 .pop()
                 .toLowerCase();
 
-            // ================== FILE TYPE ==================
             if (!ALLOWED_EXTENSIONS.has(extension)) {
                 showFileError(
                     "Please upload a PDF or Word document."
@@ -145,7 +131,6 @@ function MessageComposer({
                 continue;
             }
 
-            // ================== FILE SIZE ==================
             if (
                 file.size <= 0 ||
                 file.size > MAX_FILE_SIZE
@@ -156,7 +141,6 @@ function MessageComposer({
                 continue;
             }
 
-            // ================== DUPLICATE FILE ==================
             const duplicate = updatedFiles.some(
                 (existing) =>
                     existing.name === file.name &&
@@ -175,7 +159,6 @@ function MessageComposer({
                 continue;
             }
 
-            // ================== FILE COUNT ==================
             if (updatedFiles.length >= MAX_FILES) {
                 showFileError(
                     "You can attach up to 3 documents at a time."
@@ -186,7 +169,6 @@ function MessageComposer({
             updatedFiles.push(file);
         }
 
-        // ================== UPDATE SELECTED FILES ==================
         if (
             typeof onAttachmentsChange === "function"
         ) {
@@ -194,7 +176,6 @@ function MessageComposer({
         }
     }
 
-    // ================== REMOVE FILE ==================
     function handleRemoveFile(fileToRemove) {
         if (
             sending ||
@@ -210,14 +191,12 @@ function MessageComposer({
         );
     }
 
-    // ================== OPEN FILE SELECTOR ==================
     function handleAttachClick() {
         if (!canAttach) return;
 
         fileInputRef.current?.click();
     }
 
-    // ================== KEYBOARD SUBMIT ==================
     function handleKeyDown(event) {
         if (
             event.key !== "Enter" ||
@@ -234,106 +213,28 @@ function MessageComposer({
         }
     }
 
-    // ================== COMPOSER UI ==================
     return (
-        <form
-            className="chat-dashboard-composer"
-            onSubmit={onSubmit}
-            style={{
-                display: "flex",
-                flexDirection: "column",
-                width: "100%",
-                minWidth: 0,
-                padding: "9px 11px",
-                gap: 7,
-                borderRadius: 19,
-                border: "1px solid #dce4ee",
-                background: "#ffffff",
-                boxShadow:
-                    "0 3px 16px rgba(25, 45, 75, 0.055)",
-            }}
-        >
-            {/* ================== SELECTED DOCUMENTS ================== */}
+        <form className="chat-dashboard-composer qn-composer-shell" onSubmit={onSubmit}>
             {selectedFiles.length > 0 && (
-                <div
-                    className="d-flex flex-wrap"
-                    style={{
-                        gap: 7,
-                        paddingBottom: 5,
-                    }}
-                    aria-label="Selected documents"
-                >
+                <div className="d-flex flex-wrap qn-composer-documents" aria-label="Selected documents">
                     {selectedFiles.map((file) => {
                         const isPDF = file.name
                             .toLowerCase()
                             .endsWith(".pdf");
 
                         return (
-                            <div
-                                key={`${file.name}-${file.size}-${file.lastModified}`}
-                                className="d-inline-flex align-items-center"
-                                style={{
-                                    maxWidth: "100%",
-                                    minWidth: 0,
-                                    gap: 8,
-                                    padding: "6px 8px",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: 10,
-                                    background: "#f5f8fc",
-                                }}
-                            >
-                                {/* ================== FILE ICON ================== */}
-                                <i
-                                    className={
-                                        isPDF
-                                            ? "fa-regular fa-file-pdf"
-                                            : "fa-regular fa-file-word"
-                                    }
-                                    style={{
-                                        color: isPDF
-                                            ? "#b45160"
-                                            : "#416da0",
-                                        fontSize: 15,
-                                        flexShrink: 0,
-                                    }}
-                                    aria-hidden="true"
-                                />
-
-                                {/* ================== FILE DETAILS ================== */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        minWidth: 0,
-                                        maxWidth: 185,
-                                    }}
-                                >
-                                    <span
-                                        title={file.name}
-                                        style={{
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                            color: "#34465f",
-                                            fontSize: 11,
-                                            fontWeight: 600,
-                                        }}
-                                    >
+                            <div key={`${file.name}-${file.size}-${file.lastModified}`} className="d-inline-flex align-items-center qn-composer-document">
+                                <i className={`${isPDF ? "fa-regular fa-file-pdf" : "fa-regular fa-file-word"} qn-composer-file-icon`} aria-hidden="true" />
+                                <div className="qn-composer-file-details">
+                                    <span className="qn-composer-file-name" title={file.name}>
                                         {file.name}
                                     </span>
 
-                                    <span
-                                        style={{
-                                            color: "#8593a6",
-                                            fontSize: 10,
-                                        }}
-                                    >
+                                    <span className="qn-composer-file-size">
                                         {formatFileSize(file.size)}
                                     </span>
                                 </div>
-
-                                {/* ================== REMOVE ATTACHMENT ================== */}
-                                <button
+                                <button className="qn-composer-remove-file"
                                     type="button"
                                     onClick={() =>
                                         handleRemoveFile(file)
@@ -341,47 +242,18 @@ function MessageComposer({
                                     disabled={sending}
                                     title="Remove attachment"
                                     aria-label={`Remove ${file.name}`}
-                                    style={{
-                                        display: "grid",
-                                        placeItems: "center",
-                                        width: 23,
-                                        height: 23,
-                                        flexShrink: 0,
-                                        padding: 0,
-                                        border: "none",
-                                        borderRadius: 7,
-                                        background: "transparent",
-                                        color: "#8795a7",
-                                        cursor: sending
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    }}
                                 >
-                                    <i
-                                        className="fa-solid fa-xmark"
-                                        aria-hidden="true"
-                                    />
+                                    <i className="fa-solid fa-xmark" aria-hidden="true" />
                                 </button>
                             </div>
                         );
                     })}
                 </div>
             )}
-
-            {/* ================== COMPACT MESSAGE ROW ================== */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 7,
-                    width: "100%",
-                    minWidth: 0,
-                }}
-            >
-                {/* ================== ATTACH FILE BUTTON ================== */}
+            <div className="qn-composer-input-row">
                 <button
                     type="button"
-                    className="chat-composer-attach"
+                    className="chat-composer-attach qn-composer-attach-button"
                     onClick={handleAttachClick}
                     disabled={!canAttach}
                     title={
@@ -390,44 +262,15 @@ function MessageComposer({
                             : "Attachment limit reached"
                     }
                     aria-label="Attach PDF or Word document"
-                    style={{
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
-                        width: 35,
-                        height: 35,
-                        minHeight: 35,
-                        padding: 0,
-                        border: "none",
-                        borderRadius: 11,
-                        background: "#f1f5fa",
-                        color: "#526a88",
-                        fontSize: 15,
-                        opacity: canAttach ? 1 : 0.45,
-                    }}
                 >
-                    <i
-                        className="fa-solid fa-paperclip"
-                        aria-hidden="true"
-                    />
+                    <i className="fa-solid fa-paperclip" aria-hidden="true" />
                 </button>
-
-                {/* ================== MESSAGE TEXTAREA ================== */}
-                <div
-                    style={{
-                        flex: 1,
-                        minWidth: 0,
-                        alignSelf: "center",
-                    }}
-                >
-                    <label
-                        htmlFor={inputId}
-                        className="visually-hidden"
-                    >
+                <div className="qn-composer-input-wrap">
+                    <label htmlFor={inputId} className="visually-hidden">
                         Type your message
                     </label>
 
-                    <textarea
+                    <textarea className="qn-composer-textarea"
                         id={inputId}
                         ref={setTextareaRef}
                         value={messageText}
@@ -438,34 +281,11 @@ function MessageComposer({
                         maxLength={100000}
                         disabled={sending}
                         aria-label="Message QueryNest AI"
-                        style={{
-                            display: "block",
-                            boxSizing: "border-box",
-                            width: "100%",
-                            height: MIN_TEXTAREA_HEIGHT,
-                            minHeight: MIN_TEXTAREA_HEIGHT,
-                            maxHeight: MAX_TEXTAREA_HEIGHT,
-                            margin: 0,
-                            padding: "6px 2px",
-                            border: "none",
-                            outline: "none",
-                            resize: "none",
-                            background: "transparent",
-                            color: "#27384f",
-                            fontFamily: "inherit",
-                            fontSize: 14,
-                            fontWeight: 400,
-                            lineHeight: "22px",
-                            overflowX: "hidden",
-                            overflowY: "hidden",
-                        }}
                     />
                 </div>
-
-                {/* ================== SEND MESSAGE BUTTON ================== */}
                 <button
                     type="submit"
-                    className="chat-composer-send"
+                    className="chat-composer-send qn-composer-send-button"
                     disabled={!canSend}
                     title={
                         sending
@@ -477,40 +297,10 @@ function MessageComposer({
                             ? "Sending message"
                             : "Send message"
                     }
-                    style={{
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
-                        width: 35,
-                        height: 35,
-                        minHeight: 35,
-                        padding: 0,
-                        border: "none",
-                        borderRadius: 11,
-                        background: canSend
-                            ? "#355d8a"
-                            : "#edf1f5",
-                        color: canSend
-                            ? "#ffffff"
-                            : "#a2aec0",
-                        fontSize: 15,
-                        cursor: canSend
-                            ? "pointer"
-                            : "not-allowed",
-                    }}
                 >
-                    <i
-                        className={
-                            sending
-                                ? "fa-solid fa-spinner fa-spin"
-                                : "fa-solid fa-arrow-up"
-                        }
-                        aria-hidden="true"
-                    />
+                    <i className={ sending ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-up" } aria-hidden="true" />
                 </button>
             </div>
-
-            {/* ================== HIDDEN FILE INPUT ================== */}
             <input
                 ref={fileInputRef}
                 type="file"

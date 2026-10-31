@@ -1,4 +1,3 @@
-
 const express = require("express");
 
 const chatController = require("../controllers/chatController");
@@ -16,78 +15,26 @@ const {
     generateAISchema,
 } = require("../validations/schema");
 
-
 // ================== ROUTER SETUP ==================
 const router = express.Router();
 
 // ================== AUTHENTICATION ==================
 router.use(authMiddleware);
 
-// ================== CREATE CONVERSATION ==================
-router.post(
-    "/",
-    validateMiddleware(chatMessageSchema),
-    chatController.createConversation
-);
+router.post("/", validateMiddleware(chatMessageSchema), chatController.createConversation);
 
-// ================== CHAT HISTORY ==================
-router.get(
-    "/",
-    validateMiddleware(chatHistoryQuerySchema, { source: "query" }),
-    chatController.getChatHistory
-);
+router.get("/", validateMiddleware(chatHistoryQuerySchema, { source: "query" }), chatController.getChatHistory);
 
-// ================== GET CONVERSATION ==================
-router.get(
-    "/:conversationId",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    chatController.getConversation
-);
+router.get("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.getConversation);
 
-// ================== RENAME CONVERSATION ==================
-router.patch(
-    "/:conversationId",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    validateMiddleware(renameConversationSchema),
-    chatController.renameConversation
-);
+router.patch("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(renameConversationSchema), chatController.renameConversation);
 
-// ================== DELETE CONVERSATION ==================
-router.delete(
-    "/:conversationId",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    chatController.deleteConversation
-);
+router.delete("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.deleteConversation);
 
-// ================== ADD USER MESSAGE ==================
-router.post(
-    "/:conversationId/messages",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    validateMiddleware(chatMessageSchema),
-    chatController.addUserMessage
-);
+router.post("/:conversationId/messages", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(chatMessageSchema), chatController.addUserMessage);
 
-// ================== MESSAGE HISTORY ==================
-router.get(
-    "/:conversationId/messages",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    validateMiddleware(messageHistoryQuerySchema, { source: "query" }),
-    chatController.getMessageHistory
-);
+router.get("/:conversationId/messages", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(messageHistoryQuerySchema, { source: "query" }), chatController.getMessageHistory);
 
-// ================== GENERATE AI RESPONSE ==================
-router.post(
-    "/:conversationId/generate",
-    validateMiddleware(conversationParamsSchema, { source: "params" }),
-    ownershipMiddleware,
-    validateMiddleware(generateAISchema),
-    chatController.generateAIResponse
-);
+router.post("/:conversationId/generate", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(generateAISchema), chatController.generateAIResponse);
 
-// ================== EXPORT ==================
 module.exports = router;

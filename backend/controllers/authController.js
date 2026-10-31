@@ -1,25 +1,9 @@
-
 const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
 const AuthSession = require("../models/AuthSession");
 const ExpressError = require("../utils/ExpressError");
 const generateToken = require("../utils/generateToken");
-
-// ================== AUTHENTICATION CONFIGURATION ==================
-const COOKIE_NAME = "token";
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-const PASSWORD_SALT_ROUNDS = 12;
-
-// ================== COOKIE OPTIONS ==================
-function getCookieOptions() {
-    return {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-    };
-}
 
 // ================== USER RESPONSE ==================
 function getUserResponse(user) {
@@ -34,6 +18,21 @@ function getUserResponse(user) {
         avatar: {
             url: user.avatar?.url || "",
         },
+    };
+}
+
+// ================== AUTHENTICATION CONFIGURATION ==================
+const COOKIE_NAME = "token";
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const PASSWORD_SALT_ROUNDS = 12;
+
+// ================== COOKIE OPTIONS ==================
+function getCookieOptions() {
+    return {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
     };
 }
 

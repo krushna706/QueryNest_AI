@@ -1,10 +1,4 @@
-
-import {
-    memo,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -47,110 +41,43 @@ function formatMessageTime(date) {
 // ================== MARKDOWN COMPONENTS ==================
 const markdownComponents = {
 
-    // ================== HEADINGS ==================
     h1: ({ node, ...props }) => (
-        <h2
-            {...props}
-            style={{
-                margin: "18px 0 10px",
-                fontSize: "20px",
-                fontWeight: 700,
-                lineHeight: 1.5,
-            }}
-        />
+        <h2 {...props} className="qn-markdown-heading-lg" />
     ),
 
     h2: ({ node, ...props }) => (
-        <h3
-            {...props}
-            style={{
-                margin: "16px 0 9px",
-                fontSize: "17px",
-                fontWeight: 700,
-                lineHeight: 1.5,
-            }}
-        />
+        <h3 {...props} className="qn-markdown-heading-md" />
     ),
 
     h3: ({ node, ...props }) => (
-        <h4
-            {...props}
-            style={{
-                margin: "14px 0 8px",
-                fontSize: "15px",
-                fontWeight: 700,
-                lineHeight: 1.5,
-            }}
-        />
+        <h4 {...props} className="qn-markdown-heading-sm" />
     ),
 
-    // ================== PARAGRAPH ==================
     p: ({ node, ...props }) => (
-        <p
-            {...props}
-            style={{
-                margin: "0 0 12px",
-                lineHeight: 1.8,
-            }}
-        />
+        <p {...props} className="qn-markdown-paragraph" />
     ),
 
-    // ================== UNORDERED LIST ==================
     ul: ({ node, ...props }) => (
-        <ul
-            {...props}
-            style={{
-                margin: "8px 0 13px",
-                paddingLeft: "24px",
-                listStyleType: "disc",
-            }}
-        />
+        <ul {...props} className="qn-markdown-ul" />
     ),
 
-    // ================== ORDERED LIST ==================
     ol: ({ node, ...props }) => (
-        <ol
-            {...props}
-            style={{
-                margin: "8px 0 13px",
-                paddingLeft: "24px",
-                listStyleType: "decimal",
-            }}
-        />
+        <ol {...props} className="qn-markdown-ol" />
     ),
 
-    // ================== LIST ITEM ==================
     li: ({ node, ...props }) => (
-        <li
-            {...props}
-            style={{
-                marginBottom: "5px",
-                lineHeight: 1.7,
-            }}
-        />
+        <li {...props} className="qn-markdown-list-item" />
     ),
 
-    // ================== INLINE CODE ==================
     code: ({ node, children, className, ...props }) => (
         <code
             {...props}
-            className={className}
-            style={{
-                padding: "2px 5px",
-                borderRadius: "5px",
-                color: "#a43d65",
-                background: "#f1f4f9",
-                fontFamily:
-                    "Consolas, Monaco, 'Courier New', monospace",
-                fontSize: "0.9em",
-                overflowWrap: "anywhere",
-            }}
+            className={[className, "qn-markdown-inline-code"].filter(Boolean).join(" ")}
         >
             {children}
         </code>
     ),
 
-    // ================== CODE BLOCK ==================
     pre: ({ node, children }) => {
         const codeNode = node?.children?.find(
             (child) =>
@@ -179,111 +106,45 @@ const markdownComponents = {
             .join("");
 
         return (
-            <CodeBlock
-                language={language}
-                code={codeText}
-            />
+            <CodeBlock language={language} code={codeText} />
         );
     },
 
-    // ================== BLOCKQUOTE ==================
     blockquote: ({ node, ...props }) => (
-        <blockquote
-            {...props}
-            style={{
-                margin: "12px 0",
-                padding: "10px 15px",
-                borderLeft: "3px solid #9eb7d6",
-                borderRadius: "0 7px 7px 0",
-                color: "#53677f",
-                background: "#f4f7fb",
-            }}
-        />
+        <blockquote {...props} className="qn-markdown-quote" />
     ),
 
-    // ================== TABLE ==================
     table: ({ node, ...props }) => (
-        <div
-            style={{
-                width: "100%",
-                maxWidth: "100%",
-                overflowX: "auto",
-                margin: "13px 0",
-                border: "1px solid #dce5f0",
-                borderRadius: "9px",
-            }}
-        >
-            <table
+        <div className="qn-markdown-table-scroll">
+            <table className="qn-markdown-table"
                 {...props}
-                style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "13px",
-                    whiteSpace: "normal",
-                }}
             />
         </div>
     ),
 
-    // ================== TABLE HEADER ==================
     th: ({ node, ...props }) => (
-        <th
-            {...props}
-            style={{
-                padding: "10px 12px",
-                borderBottom: "1px solid #dce5f0",
-                color: "#355477",
-                background: "#edf2f8",
-                fontWeight: 700,
-                textAlign: "left",
-                whiteSpace: "nowrap",
-            }}
-        />
+        <th {...props} className="qn-markdown-th" />
     ),
 
-    // ================== TABLE CELL ==================
     td: ({ node, ...props }) => (
-        <td
-            {...props}
-            style={{
-                padding: "9px 12px",
-                borderBottom: "1px solid #e8edf4",
-                color: "#3f5066",
-                verticalAlign: "top",
-            }}
-        />
+        <td {...props} className="qn-markdown-td" />
     ),
 
-    // ================== LINKS ==================
     a: ({ node, href, children, ...props }) => (
-        <a
+        <a className="qn-markdown-link"
             {...props}
             href={href}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            style={{
-                color: "#2867a5",
-                textDecoration: "underline",
-                textUnderlineOffset: "3px",
-                overflowWrap: "anywhere",
-            }}
         >
             {children}
         </a>
     ),
 
-    // ================== HORIZONTAL RULE ==================
     hr: () => (
-        <hr
-            style={{
-                margin: "16px 0",
-                border: 0,
-                borderTop: "1px solid #e1e8f1",
-            }}
-        />
+        <hr className="qn-markdown-rule" />
     ),
 
-    // ================== IMAGE REFERENCES ==================
     img: ({ alt }) => (
         <span>
             {alt ? `[Image: ${alt}]` : "[Image]"}
@@ -304,14 +165,7 @@ function MessageAttachments({
     }
 
     return (
-        <div
-            className="d-flex flex-wrap"
-            style={{
-                gap: 8,
-                marginBottom: 11,
-                maxWidth: "100%",
-            }}
-        >
+        <div className="d-flex flex-wrap qn-message-attachments">
             {attachmentIds.map((documentId) => {
                 const id = String(documentId);
                 const document = documentMap[id];
@@ -329,66 +183,20 @@ function MessageAttachments({
                     );
 
                 return (
-                    <div
-                        key={id}
-                        title={filename}
-                        className="d-flex align-items-center"
-                        style={{
-                            gap: 9,
-                            minWidth: 0,
-                            maxWidth: "100%",
-                            padding: "8px 11px",
-                            border: "1px solid #d9e3f0",
-                            borderRadius: 11,
-                            background: "#ffffff",
-                        }}
-                    >
-                        {/* ================== FILE ICON ================== */}
+                    <div key={id} title={filename} className="d-flex align-items-center qn-message-attachment">
                         <i
-                            className={
-                                fileType === "pdf"
+                            className={`${fileType === "pdf"
                                     ? "fa-regular fa-file-pdf"
-                                    : "fa-regular fa-file-word"
-                            }
-                            style={{
-                                color:
-                                    fileType === "pdf"
-                                        ? "#bb5364"
-                                        : "#376cbd",
-                                fontSize: 18,
-                                flexShrink: 0,
-                            }}
+                                    : "fa-regular fa-file-word"} qn-message-file-icon`}
+                            
                             aria-hidden="true"
                         />
-
-                        {/* ================== FILE NAME ================== */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                minWidth: 0,
-                                maxWidth: 215,
-                            }}
-                        >
-                            <strong
-                                style={{
-                                    color: "#263d5a",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
+                        <div className="qn-message-file-details">
+                            <strong className="qn-message-file-name">
                                 {filename}
                             </strong>
 
-                            <small
-                                style={{
-                                    color: "#71839a",
-                                    fontSize: 10,
-                                }}
-                            >
+                            <small className="qn-message-file-type">
                                 {fileType === "pdf"
                                     ? "PDF Document"
                                     : "Word Document"}
@@ -414,7 +222,6 @@ const MessageItem = memo(function MessageItem({
     onRegenerate,
     onRetry,
 }) {
-    // ================== MESSAGE DETAILS ==================
     const isAssistant = item.role === "assistant";
 
     const content =
@@ -427,7 +234,6 @@ const MessageItem = memo(function MessageItem({
     const statusMessage =
         MESSAGE_STATUSES[status] || "";
 
-    // ================== PROVIDER NAME ==================
     const providerName =
         item.provider === "groq"
             ? "Groq"
@@ -435,7 +241,6 @@ const MessageItem = memo(function MessageItem({
                 ? "Gemini"
                 : null;
 
-    // ================== RESPONSE ACTIONS ==================
     const canRegenerate =
         isAssistant &&
         showActions &&
@@ -455,17 +260,8 @@ const MessageItem = memo(function MessageItem({
 
     return (
         <article
-            className={`conversation-message conversation-message-${item.role}`}
-            style={
-                isAssistant
-                    ? {
-                        width: "100%",
-                        maxWidth: "100%",
-                    }
-                    : undefined
-            }
+            className={`conversation-message conversation-message-${item.role}${isAssistant ? " qn-message-assistant-box" : ""}`}
         >
-            {/* ================== MESSAGE HEADING ================== */}
             <div className="conversation-message-heading">
                 <span>
                     {isAssistant
@@ -477,31 +273,11 @@ const MessageItem = memo(function MessageItem({
                     {formatMessageTime(item.createdAt)}
                 </time>
             </div>
-
-            {/* ================== MESSAGE CONTENT ================== */}
-            <div
-                className="conversation-message-content"
-                style={{
-                    minWidth: 0,
-                    whiteSpace: isAssistant
-                        ? "normal"
-                        : "pre-wrap",
-                }}
-            >
+            <div className="conversation-message-content qn-message-content">
                 {isAssistant ? (
                     content ? (
-                        <div
-                            className="chat-markdown-content"
-                            style={{
-                                minWidth: 0,
-                                overflowWrap: "anywhere",
-                            }}
-                        >
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={markdownComponents}
-                                skipHtml
-                            >
+                        <div className="chat-markdown-content qn-message-markdown">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents} skipHtml>
                                 {content}
                             </ReactMarkdown>
                         </div>
@@ -512,80 +288,34 @@ const MessageItem = memo(function MessageItem({
                     )
                 ) : (
                     <>
-                        {/* ================== UPLOADED FILE PREVIEW ================== */}
-                        <MessageAttachments
-                            attachmentIds={item.attachmentIds}
-                            documentMap={documentMap}
-                        />
-
-                        {/* ================== USER MESSAGE TEXT ================== */}
-                        <div
-                            style={{
-                                whiteSpace: "pre-wrap",
-                                overflowWrap: "anywhere",
-                            }}
-                        >
+                        <MessageAttachments attachmentIds={item.attachmentIds} documentMap={documentMap} />
+                        <div className="qn-message-plain-text">
                             {content}
                         </div>
                     </>
                 )}
             </div>
-
-            {/* ================== AI MODEL INFORMATION ================== */}
             {isAssistant && providerName && (
-                <span
-                    style={{
-                        padding: "0 4px",
-                        color: "#526780",
-                        fontSize: "11px",
-                        fontWeight: 500,
-                        overflowWrap: "anywhere",
-                    }}
-                >
+                <span className="qn-message-provider">
                     <strong>Model: </strong>
                     {providerName}
                     {item.model ? ` · ${item.model}` : ""}
                 </span>
             )}
-
-            {/* ================== RESPONSE STATUS ================== */}
             {isAssistant &&
                 status !== "completed" &&
                 statusMessage && (
                     <span
-                        className="conversation-message-error"
-                        style={
-                            ["queued", "streaming"].includes(status)
-                                ? { color: "#637b96" }
-                                : undefined
-                        }
+                        className={ ["queued", "streaming"].includes(status) ? "conversation-message-error qn-message-status-pending" : "conversation-message-error" }
                     >
                         {statusMessage}
                     </span>
                 )}
-
-            {/* ================== COMPACT RESPONSE ACTIONS ================== */}
             {hasActions && (
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: 10,
-                        padding: "8px 4px 0",
-                    }}
-                >
-                    {/* ================== RETRY / REGENERATE ================== */}
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 7,
-                        }}
-                    >
+                <div className="qn-message-actions">
+                    <div className="qn-message-action-main">
                         {(canRegenerate || canRetry) && (
-                            <button
+                            <button className="qn-message-action-button"
                                 type="button"
                                 disabled={actionsDisabled}
                                 onClick={
@@ -598,31 +328,8 @@ const MessageItem = memo(function MessageItem({
                                         ? "Regenerate response"
                                         : "Retry response"
                                 }
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 6,
-                                    minHeight: 27,
-                                    padding: "4px 9px",
-                                    border: "1px solid #dbe3ee",
-                                    borderRadius: 7,
-                                    background: "#ffffff",
-                                    color: "#61758f",
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    cursor: actionsDisabled
-                                        ? "not-allowed"
-                                        : "pointer",
-                                    opacity: actionsDisabled
-                                        ? 0.5
-                                        : 1,
-                                }}
                             >
-                                <i
-                                    className="fa-solid fa-arrows-rotate"
-                                    aria-hidden="true"
-                                />
+                                <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
 
                                 {canRegenerate
                                     ? "Regenerate"
@@ -630,71 +337,21 @@ const MessageItem = memo(function MessageItem({
                             </button>
                         )}
                     </div>
-
-                    {/* ================== RESPONSE VERSION NAVIGATION ================== */}
                     {isAssistant && versionCount > 1 && (
-                        <div
-                            className="chat-response-versions"
-                            role="group"
-                            aria-label="AI response versions"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "flex-end",
-                                gap: 8,
-                                marginLeft: "auto",
-                            }}
-                        >
-                            {/* ================== PREVIOUS VERSION ================== */}
-                            <button
+                        <div className="chat-response-versions qn-message-versions" role="group" aria-label="AI response versions">
+                            <button className="qn-message-version-button-prev"
                                 type="button"
                                 onClick={onPrevious}
                                 disabled={versionIndex === 0}
                                 aria-label="Previous AI response version"
                                 title="Previous response"
-                                style={{
-                                    display: "grid",
-                                    placeItems: "center",
-                                    width: 27,
-                                    height: 27,
-                                    padding: 0,
-                                    border: "1px solid #dce5f0",
-                                    borderRadius: 7,
-                                    background: "#ffffff",
-                                    color: "#49688e",
-                                    cursor:
-                                        versionIndex === 0
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    opacity:
-                                        versionIndex === 0
-                                            ? 0.4
-                                            : 1,
-                                }}
                             >
-                                <i
-                                    className="fa-solid fa-chevron-left"
-                                    aria-hidden="true"
-                                />
+                                <i className="fa-solid fa-chevron-left" aria-hidden="true" />
                             </button>
-
-                            {/* ================== VERSION COUNT ================== */}
-                            <span
-                                aria-live="polite"
-                                style={{
-                                    minWidth: 40,
-                                    color: "#5e7594",
-                                    fontSize: 11,
-                                    fontWeight: 600,
-                                    textAlign: "center",
-                                    fontVariantNumeric: "tabular-nums",
-                                }}
-                            >
+                            <span className="qn-message-version-label" aria-live="polite">
                                 {versionIndex + 1} / {versionCount}
                             </span>
-
-                            {/* ================== NEXT VERSION ================== */}
-                            <button
+                            <button className="qn-message-version-button-next"
                                 type="button"
                                 onClick={onNext}
                                 disabled={
@@ -702,30 +359,8 @@ const MessageItem = memo(function MessageItem({
                                 }
                                 aria-label="Next AI response version"
                                 title="Next response"
-                                style={{
-                                    display: "grid",
-                                    placeItems: "center",
-                                    width: 27,
-                                    height: 27,
-                                    padding: 0,
-                                    border: "1px solid #dce5f0",
-                                    borderRadius: 7,
-                                    background: "#ffffff",
-                                    color: "#49688e",
-                                    cursor:
-                                        versionIndex === versionCount - 1
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    opacity:
-                                        versionIndex === versionCount - 1
-                                            ? 0.4
-                                            : 1,
-                                }}
                             >
-                                <i
-                                    className="fa-solid fa-chevron-right"
-                                    aria-hidden="true"
-                                />
+                                <i className="fa-solid fa-chevron-right" aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -739,7 +374,6 @@ const MessageItem = memo(function MessageItem({
 function groupMessageVersions(messages) {
     const versionsByReply = new Map();
 
-    // ================== COLLECT AI ATTEMPTS ==================
     for (const item of messages) {
         if (
             item.role !== "assistant" ||
@@ -757,7 +391,6 @@ function groupMessageVersions(messages) {
         versionsByReply.get(replyId).push(item);
     }
 
-    // ================== BUILD DISPLAY ITEMS ==================
     const renderedReplies = new Set();
     const displayItems = [];
 
@@ -805,18 +438,14 @@ function MessageList({
     onRetry,
     actionsDisabled = false,
 }) {
-    // ================== RESPONSE VERSION STATE ==================
     const [selectedVersions, setSelectedVersions] = useState({});
 
-    // ================== DOCUMENT METADATA ==================
     const [documentMap, setDocumentMap] = useState({});
 
-    // ================== CONVERSATION ID ==================
     const conversationId = messages.find(
         (item) => item?.conversationId
     )?.conversationId;
 
-    // ================== REFERENCED ATTACHMENTS ==================
     const attachmentKey = messages
         .filter((item) => item?.role === "user")
         .flatMap(
@@ -827,7 +456,6 @@ function MessageList({
         )
         .join(",");
 
-    // ================== LOAD DOCUMENT NAMES ==================
     useEffect(() => {
         const controller = new AbortController();
         let active = true;
@@ -886,19 +514,16 @@ function MessageList({
         };
     }, [conversationId, attachmentKey]);
 
-    // ================== GROUP MESSAGES ==================
     const displayItems = useMemo(
         () => groupMessageVersions(messages),
         [messages]
     );
 
-    // ================== LAST USER MESSAGE ==================
     const lastUserMessageId = [...messages]
         .reverse()
         .find((item) => item.role === "user")
         ?._id;
 
-    // ================== SELECT RESPONSE VERSION ==================
     function selectVersion(replyId, versions, index) {
         if (
             !replyId ||
@@ -919,44 +544,27 @@ function MessageList({
 
     return (
         <div className="conversation-message-list">
-
-            {/* ================== LOAD EARLIER MESSAGES ================== */}
             {hasMore && (
                 <div className="conversation-load-more">
-                    <button
-                        type="button"
-                        onClick={onLoadMore}
-                        disabled={
-                            loadingMore ||
-                            typeof onLoadMore !== "function"
-                        }
-                    >
+                    <button type="button" onClick={onLoadMore} disabled={ loadingMore || typeof onLoadMore !== "function" }>
                         {loadingMore
                             ? "Loading..."
                             : "Load Earlier Messages"}
                     </button>
                 </div>
             )}
-
-            {/* ================== EMPTY CONVERSATION ================== */}
             {messages.length === 0 && (
                 <div className="conversation-empty">
-                    <i
-                        className="fa-regular fa-comments"
-                        aria-hidden="true"
-                    />
+                    <i className="fa-regular fa-comments" aria-hidden="true" />
 
                     <h2>Start your conversation</h2>
 
                     <p>Type a message to begin.</p>
                 </div>
             )}
-
-            {/* ================== RENDER MESSAGES ================== */}
             {displayItems.map((group) => {
                 const { replyId, versions } = group;
 
-                // ================== SELECT LATEST BY DEFAULT ==================
                 const savedSelection = replyId
                     ? selectedVersions[replyId]
                     : null;

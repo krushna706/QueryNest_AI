@@ -1,4 +1,3 @@
-
 import api from "./api";
 
 // ================== DOCUMENT LIMITS ==================
@@ -70,14 +69,12 @@ async function uploadDocuments(
 ) {
     const selectedFiles = validateUploadFiles(files);
 
-    // ================== FORM DATA ==================
     const formData = new FormData();
 
     selectedFiles.forEach((file) => {
         formData.append("files", file);
     });
 
-    // ================== API ENDPOINT ==================
     const endpoint = conversationId
         ? `/documents/${validateDocumentId(
             conversationId,
@@ -85,7 +82,6 @@ async function uploadDocuments(
         )}`
         : "/documents";
 
-    // ================== SEND DOCUMENTS ==================
     const { data } = await api.post(
         endpoint,
         formData,

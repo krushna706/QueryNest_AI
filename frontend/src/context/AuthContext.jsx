@@ -1,12 +1,4 @@
-
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import api from "../services/api";
 
@@ -54,7 +46,6 @@ export function AuthProvider({ children }) {
     const sessionRequestId = useRef(0);
     const backgroundRequest = useRef(false);
 
-    // ================== CLEAR SESSION ==================
     const clearSession = useCallback(() => {
         sessionRequestId.current += 1;
 
@@ -63,7 +54,6 @@ export function AuthProvider({ children }) {
         setLoading(false);
     }, []);
 
-    // ================== RESTORE SESSION ==================
     const refreshUser = useCallback(async (options = {}) => {
         const silent = options?.silent === true;
         const requestId = ++sessionRequestId.current;
@@ -82,7 +72,6 @@ export function AuthProvider({ children }) {
 
             setUser(normalizeAuthUser(data.user));
             setAuthError("");
-
         } catch (error) {
             if (requestId !== sessionRequestId.current) return;
 
@@ -91,14 +80,12 @@ export function AuthProvider({ children }) {
             if (status === 401 || status === 403) {
                 setUser(null);
                 setAuthError("");
-
             } else if (!silent) {
                 setUser(null);
                 setAuthError(
                     "Unable to check your session. Please try again."
                 );
             }
-
         } finally {
             if (requestId === sessionRequestId.current) {
                 setLoading(false);
@@ -106,7 +93,6 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
-    // ================== API INTERCEPTORS ==================
     useEffect(() => {
         const requestId = api.interceptors.request.use(
             (config) => {
@@ -147,7 +133,6 @@ export function AuthProvider({ children }) {
         };
     }, [clearSession, refreshUser]);
 
-    // ================== INITIAL SESSION CHECK ==================
     useEffect(() => {
         refreshUser();
 
@@ -156,7 +141,6 @@ export function AuthProvider({ children }) {
         };
     }, [refreshUser]);
 
-    // ================== TAB SESSION SYNC ==================
     useEffect(() => {
         async function checkSession() {
             if (
@@ -200,7 +184,6 @@ export function AuthProvider({ children }) {
         };
     }, [refreshUser]);
 
-    // ================== LOGIN ==================
     const login = useCallback(async (credentials) => {
         const { data } = await api.post(
             "/auth/login",
@@ -221,7 +204,6 @@ export function AuthProvider({ children }) {
         return data;
     }, []);
 
-    // ================== SIGNUP ==================
     const signup = useCallback(async (details) => {
         const { data } = await api.post(
             "/auth/signup",
@@ -234,7 +216,6 @@ export function AuthProvider({ children }) {
         return data;
     }, []);
 
-    // ================== UPDATE USER PROFILE ==================
     const updateUserProfile = useCallback((profile) => {
         if (!profile?._id) return;
 
@@ -268,7 +249,6 @@ export function AuthProvider({ children }) {
         notifyOtherTabs();
     }, []);
 
-    // ================== LOGOUT ==================
     const logout = useCallback(async () => {
         try {
             await api.post(
@@ -278,7 +258,6 @@ export function AuthProvider({ children }) {
                     skipSessionHandling: true,
                 }
             );
-
         } catch (error) {
             if (
                 error.response?.status !== 401 &&
@@ -292,7 +271,6 @@ export function AuthProvider({ children }) {
         notifyOtherTabs();
     }, [clearSession]);
 
-    // ================== CONTEXT PROVIDER ==================
     return (
         <AuthContext.Provider
             value={{

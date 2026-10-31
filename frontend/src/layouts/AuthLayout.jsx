@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 
 import "../css/auth.css";
@@ -50,10 +49,7 @@ function AuthLayout({ title, description, children, footer }) {
                                 {features.map((feature) => (
                                     <li key={feature.title}>
                                         <span className="auth-feature-icon">
-                                            <i
-                                                className={`fa-solid ${feature.icon}`}
-                                                aria-hidden="true"
-                                            />
+                                            <i className={`fa-solid ${feature.icon}`} aria-hidden="true" />
                                         </span>
 
                                         <div>
@@ -71,29 +67,14 @@ function AuthLayout({ title, description, children, footer }) {
                     </aside>
 
                     {/* Authentication form */}
-                    <section
-                        className="auth-form-panel"
-                        aria-labelledby="auth-page-title"
-                    >
+                    <section className="auth-form-panel" aria-labelledby="auth-page-title">
                         <div className="auth-form-content">
                             <header className="auth-form-header">
-                                <Link
-                                    to="/login"
-                                    className="auth-brand"
-                                    aria-label="QueryNest AI"
-                                >
-                                    <img
-                                        src="/images/QueryNest_AI_Logo.png"
-                                        alt="QueryNest AI"
-                                        width="270"
-                                        height="90"
-                                    />
+                                <Link to="/login" className="auth-brand" aria-label="QueryNest AI">
+                                    <img src="/images/QueryNest_AI_Logo.png" alt="QueryNest AI" width="270" height="90" />
                                 </Link>
 
-                                <h1
-                                    id="auth-page-title"
-                                    className="auth-form-title"
-                                >
+                                <h1 id="auth-page-title" className="auth-form-title">
                                     {title}
                                 </h1>
 

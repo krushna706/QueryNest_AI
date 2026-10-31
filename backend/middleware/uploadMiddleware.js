@@ -269,5 +269,96 @@ function uploadDocumentFiles(req, res, next) {
     });
 }
 
+
+// ================== PROFILE PICTURE UPLOAD ==================
+const MAX_AVATAR_SIZE = 3 * 1024 * 1024;
+
+const ALLOWED_AVATAR_TYPES = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]);
+
+const ALLOWED_AVATAR_EXTENSION = /\.(jpg|jpeg|png|webp)$/i;
+
+const avatarUpload = multer({
+    storage: multer.memoryStorage(),
+
+    limits: {
+        fileSize: MAX_AVATAR_SIZE,
+        files: 1,
+        fields: 0,
+        parts: 1,
+        fieldNameSize: 40,
+        headerPairs: 20,
+    },
+
+    fileFilter: (req, file, callback) => {
+        const validMimeType =
+            ALLOWED_AVATAR_TYPES.has(file.mimetype);
+
+        const validExtension =
+            ALLOWED_AVATAR_EXTENSION.test(
+                file.originalname || ""
+            );
+
+        if (!validMimeType || !validExtension) {
+            return callback(
+                new ExpressError(
+                    415,
+                    "Only JPG, JPEG, PNG and WebP images are allowed."
+                )
+            );
+        }
+
+        return callback(null, true);
+    },
+});
+
+function handleAvatarUpload(req, res, next) {
+    avatarUpload.single("avatar")(
+        req,
+        res,
+        (error) => {
+            if (!error) {
+                return next();
+            }
+
+            if (error instanceof multer.MulterError) {
+                if (error.code === "LIMIT_FILE_SIZE") {
+                    return next(
+                        new ExpressError(
+                            413,
+                            "Profile picture must be smaller than 3 MB."
+                        )
+                    );
+                }
+
+                if (
+                    error.code === "LIMIT_UNEXPECTED_FILE" ||
+                    error.code === "LIMIT_FILE_COUNT"
+                ) {
+                    return next(
+                        new ExpressError(
+                            400,
+                            "Upload only one profile picture using the avatar field."
+                        )
+                    );
+                }
+
+                return next(
+                    new ExpressError(
+                        400,
+                        "Invalid profile picture upload."
+                    )
+                );
+            }
+
+            return next(error);
+        }
+    );
+}
+
+
 // ================== EXPORT ==================
-module.exports = uploadDocumentFiles;
+module.exports = { uploadDocumentFiles, handleAvatarUpload };

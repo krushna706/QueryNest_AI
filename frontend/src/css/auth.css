@@ -1,5 +1,5 @@
 
-/* ================== AUTH VARIABLES ================== */
+/* Auth variables */
 .auth-layout {
     --auth-primary: #075bff;
     --auth-primary-dark: #0647c9;
@@ -20,7 +20,7 @@
         #f4f7fc;
 }
 
-/* ================== AUTH LAYOUT ================== */
+/* Auth layout */
 .auth-main {
     display: flex;
     align-items: center;
@@ -50,7 +50,7 @@
     box-shadow: 0 20px 60px rgb(7 19 61 / 9%);
 }
 
-/* ================== INTRODUCTION PANEL ================== */
+/* Introduction panel */
 .auth-introduction {
     position: relative;
     isolation: isolate;
@@ -125,7 +125,7 @@
     line-height: 1.8;
 }
 
-/* ================== FEATURE LIST ================== */
+/* Feature list */
 .auth-features {
     display: grid;
     gap: 25px;
@@ -190,7 +190,7 @@
     line-height: 1.7;
 }
 
-/* ================== AUTH FORM PANEL ================== */
+/* Auth form panel */
 .auth-form-panel {
     display: flex;
     align-items: center;
@@ -254,7 +254,7 @@
     gap: 22px;
 }
 
-/* ================== INPUT FIELDS ================== */
+/* Input fields */
 .auth-layout .auth-text-field .MuiOutlinedInput-root {
     border-radius: 11px;
 
@@ -300,7 +300,7 @@
     font-size: 12px;
 }
 
-/* ================== FORM ACTIONS ================== */
+/* Form actions */
 .auth-layout .auth-password-toggle.MuiIconButton-root {
     color: var(--auth-muted);
     font-size: 17px;
@@ -355,7 +355,7 @@
     outline-offset: 3px;
 }
 
-/* ================== FORM LINKS ================== */
+/* Form links */
 .auth-account-row {
     display: flex;
     align-items: center;
@@ -417,7 +417,7 @@
     line-height: 1.7;
 }
 
-/* ================== PASSWORD RECOVERY ================== */
+/* Password recovery */
 .auth-recovery-steps li {
     opacity: 0.6;
 }
@@ -467,7 +467,7 @@
     text-transform: none;
 }
 
-/* ================== RESPONSIVE DESIGN ================== */
+/* Responsive design */
 @media (max-width: 991.98px) {
     .auth-card {
         grid-template-columns: 1fr 1fr;
@@ -562,7 +562,7 @@
     }
 }
 
-/* ================== REDUCED MOTION ================== */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
     .auth-layout *,
     .auth-layout *::before,
