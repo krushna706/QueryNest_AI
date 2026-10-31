@@ -2,13 +2,19 @@
 const Joi = require("joi");
 
 // ================== COMMON EMAIL RULE ==================
-const emailRule = Joi.string().trim().lowercase().email().max(254).required().messages({
-    "string.base": "Email must be a string.",
-    "string.empty": "Email is required.",
-    "string.email": "Enter a valid email address.",
-    "string.max": "Email cannot exceed 254 characters.",
-    "any.required": "Email is required.",
-});
+const emailRule = Joi.string()
+    .trim()
+    .lowercase()
+    .email()
+    .max(254)
+    .required()
+    .messages({
+        "string.base": "Email must be a string.",
+        "string.empty": "Email is required.",
+        "string.email": "Enter a valid email address.",
+        "string.max": "Email cannot exceed 254 characters.",
+        "any.required": "Email is required.",
+    });
 
 // ================== COMMON PHONE RULE ==================
 const phoneRule = Joi.string()
@@ -52,20 +58,27 @@ const identifierRule = Joi.alternatives()
 
 // ================== SIGNUP VALIDATION ==================
 const signupSchema = Joi.object({
-    name: Joi.string().trim().min(2).max(100).required().messages({
-        "string.empty": "Name is required.",
-        "string.min": "Name must contain at least 2 characters.",
-        "string.max": "Name cannot exceed 100 characters.",
-        "any.required": "Name is required.",
-    }),
+    name: Joi.string()
+        .trim()
+        .min(2)
+        .max(100)
+        .required()
+        .messages({
+            "string.empty": "Name is required.",
+            "string.min": "Name must contain at least 2 characters.",
+            "string.max": "Name cannot exceed 100 characters.",
+            "any.required": "Name is required.",
+        }),
 
     email: emailRule,
 
     phone: phoneRule,
 
-    password: passwordRule.min(6).messages({
-        "string.min": "Password must contain at least 6 characters.",
-    }),
+    password: passwordRule
+        .min(6)
+        .messages({
+            "string.min": "Password must contain at least 6 characters.",
+        }),
 
     confirmPassword: Joi.string()
         .valid(Joi.ref("password"))
@@ -119,12 +132,14 @@ const forgotPasswordResetSchema = Joi.object({
         .messages({
             "string.empty": "Password reset authorization is required.",
             "string.pattern.base": "Invalid password reset authorization.",
-            "any.required": "Password reset authorization is required.",
+            "any.required": "Reset authorization is required.",
         }),
 
-    newPassword: passwordRule.min(6).messages({
-        "string.min": "Password must contain at least 6 characters.",
-    }),
+    newPassword: passwordRule
+        .min(6)
+        .messages({
+            "string.min": "Password must contain at least 6 characters.",
+        }),
 
     confirmPassword: Joi.string()
         .valid(Joi.ref("newPassword"))
@@ -137,6 +152,25 @@ const forgotPasswordResetSchema = Joi.object({
 })
     .required()
     .unknown(false);
+
+// ================== DOCUMENT ATTACHMENT RULE ==================
+const attachmentIdsRule = Joi.array()
+    .items(
+        Joi.string()
+            .trim()
+            .lowercase()
+            .hex()
+            .length(24)
+            .required()
+    )
+    .max(3)
+    .unique()
+    .default([])
+    .messages({
+        "array.base": "Attachments must be an array.",
+        "array.max": "Maximum 3 document attachments are allowed.",
+        "array.unique": "Duplicate documents are not allowed.",
+    });
 
 // ================== CHAT MESSAGE VALIDATION ==================
 const chatMessageSchema = Joi.object({
@@ -159,11 +193,36 @@ const chatMessageSchema = Joi.object({
             "string.guid": "Invalid request identifier.",
             "any.required": "Request identifier is required.",
         }),
+
+    // ================== OPTIONAL DOCUMENTS ==================
+    attachmentIds: attachmentIdsRule,
 })
     .required()
     .unknown(false);
 
-// ================== RENAME CONVERSATION VALIDATION ==================
+// ================== GENERATE AI VALIDATION ==================
+const generateAISchema = Joi.object({
+    messageId: Joi.string()
+        .hex()
+        .length(24)
+        .required()
+        .messages({
+            "string.hex": "Invalid user message ID.",
+            "string.length": "Invalid user message ID.",
+            "any.required": "User message ID is required.",
+        }),
+
+    regenerate: Joi.boolean()
+        .strict()
+        .default(false)
+        .messages({
+            "boolean.base": "Regenerate must be a boolean.",
+        }),
+})
+    .required()
+    .unknown(false);
+
+// ================== RENAME CONVERSATION ==================
 const renameConversationSchema = Joi.object({
     title: Joi.string()
         .trim()
@@ -180,7 +239,7 @@ const renameConversationSchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== CONVERSATION ID VALIDATION ==================
+// ================== CONVERSATION ID ==================
 const conversationParamsSchema = Joi.object({
     conversationId: Joi.string()
         .hex()
@@ -195,7 +254,7 @@ const conversationParamsSchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== CHAT HISTORY VALIDATION ==================
+// ================== CHAT HISTORY QUERY ==================
 const chatHistoryQuerySchema = Joi.object({
     search: Joi.string()
         .trim()
@@ -216,7 +275,7 @@ const chatHistoryQuerySchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== MESSAGE HISTORY VALIDATION ==================
+// ================== MESSAGE HISTORY QUERY ==================
 const messageHistoryQuerySchema = Joi.object({
     before: Joi.string()
         .hex()
@@ -232,28 +291,6 @@ const messageHistoryQuerySchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== AI GENERATION VALIDATION ==================
-const generateAISchema = Joi.object({
-    messageId: Joi.string()
-        .hex()
-        .length(24)
-        .required()
-        .messages({
-            "string.hex": "Invalid message ID.",
-            "string.length": "Invalid message ID.",
-            "any.required": "Message ID is required.",
-        }),
-
-    regenerate: Joi.boolean()
-        .strict()
-        .default(false)
-        .messages({
-            "boolean.base": "Regenerate must be true or false.",
-        }),
-})
-    .required()
-    .unknown(false);
-
 // ================== EXPORTS ==================
 module.exports = {
     signupSchema,
@@ -261,10 +298,12 @@ module.exports = {
     forgotPasswordRequestSchema,
     forgotPasswordVerifySchema,
     forgotPasswordResetSchema,
+
     chatMessageSchema,
+    generateAISchema,
     renameConversationSchema,
+
     conversationParamsSchema,
     chatHistoryQuerySchema,
     messageHistoryQuerySchema,
-    generateAISchema,
 };

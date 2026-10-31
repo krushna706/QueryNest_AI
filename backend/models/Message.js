@@ -28,6 +28,13 @@ const sourceSchema = new Schema(
             required: true,
         },
 
+        citationId: {
+            type: String,
+            trim: true,
+            maxlength: 20,
+            default: null,
+        },
+
         filename: {
             type: String,
             required: true,
@@ -35,16 +42,135 @@ const sourceSchema = new Schema(
             maxlength: 255,
         },
 
+        // ================== FILE TYPE ==================
+        fileType: {
+            type: String,
+            enum: ["pdf", "docx"],
+            default: "pdf",
+            required: true,
+        },
+
+        label: {
+            type: String,
+            trim: true,
+            maxlength: 400,
+            default: null,
+        },
+
+        // ================== PDF PAGE REFERENCE ==================
         pageNumber: {
             type: Number,
-            required: true,
             min: 1,
+            default: null,
+            required() {
+                return this.fileType === "pdf";
+            },
+            validate: {
+                validator(value) {
+                    return value == null || Number.isSafeInteger(value);
+                },
+                message: "Page number must be a positive integer.",
+            },
+        },
+
+        // ================== DOCX SECTION REFERENCE ==================
+        sectionTitle: {
+            type: String,
+            trim: true,
+            maxlength: 250,
+            default: null,
+        },
+
+        paragraphStart: {
+            type: Number,
+            min: 1,
+            default: null,
+            validate: {
+                validator(value) {
+                    return value == null || Number.isSafeInteger(value);
+                },
+                message: "Paragraph start must be an integer.",
+            },
+        },
+
+        paragraphEnd: {
+            type: Number,
+            min: 1,
+            default: null,
+            validate: {
+                validator(value) {
+                    return value == null || Number.isSafeInteger(value);
+                },
+                message: "Paragraph end must be an integer.",
+            },
+        },
+
+        // ================== SOURCE EXCERPT ==================
+        text: {
+            type: String,
+            default: "",
+            maxlength: 8000,
+        },
+
+        // ================== RETRIEVAL SCORE ==================
+        score: {
+            type: Number,
+            min: 0,
+            max: 1,
+            default: null,
         },
     },
     {
         _id: false,
     }
 );
+
+// ================== SOURCE VALIDATION ==================
+sourceSchema.pre("validate", function () {
+    if (
+        this.fileType === "docx" &&
+        this.pageNumber != null
+    ) {
+        this.invalidate(
+            "pageNumber",
+            "DOCX citations cannot use PDF page numbers."
+        );
+    }
+
+    if (
+        (this.paragraphStart == null) !==
+        (this.paragraphEnd == null)
+    ) {
+        this.invalidate(
+            "paragraphEnd",
+            "Both paragraph boundaries are required together."
+        );
+    }
+
+    if (
+        this.paragraphStart != null &&
+        this.paragraphEnd != null &&
+        this.paragraphEnd < this.paragraphStart
+    ) {
+        this.invalidate(
+            "paragraphEnd",
+            "Paragraph end cannot precede paragraph start."
+        );
+    }
+
+    if (
+        this.fileType === "pdf" &&
+        (
+            this.paragraphStart != null ||
+            this.paragraphEnd != null
+        )
+    ) {
+        this.invalidate(
+            "paragraphStart",
+            "PDF citations must use page references."
+        );
+    }
+});
 
 // ================== MESSAGE SCHEMA ==================
 const messageSchema = new Schema(
@@ -119,7 +245,7 @@ const messageSchema = new Schema(
             default: null,
         },
 
-        // ================== DOCUMENT REFERENCES ==================
+        // ================== DOCUMENT ATTACHMENTS ==================
         attachmentIds: {
             type: [
                 {
@@ -130,6 +256,7 @@ const messageSchema = new Schema(
             default: [],
         },
 
+        // ================== DOCUMENT CITATIONS ==================
         sources: {
             type: [sourceSchema],
             default: [],
@@ -163,13 +290,18 @@ messageSchema.index(
         unique: true,
         partialFilterExpression: {
             role: "user",
-            clientRequestId: { $type: "string" },
+            clientRequestId: {
+                $type: "string",
+            },
         },
     }
 );
 
 // ================== MODEL ==================
-const Message = mongoose.model("Message", messageSchema);
+const Message = mongoose.model(
+    "Message",
+    messageSchema
+);
 
 // ================== EXPORT ==================
 module.exports = Message;

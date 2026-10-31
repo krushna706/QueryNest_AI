@@ -1,10 +1,16 @@
 
-import { memo, useMemo, useState } from "react";
+import {
+    memo,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import CodeBlock from "./CodeBlock";
+import { getDocuments } from "../../services/documentService";
 
 // ================== MESSAGE STATUS ==================
 const MESSAGE_STATUSES = {
@@ -15,6 +21,12 @@ const MESSAGE_STATUSES = {
     failed: "Response failed.",
     cancelled: "Generation cancelled.",
 };
+
+const RETRYABLE_STATUSES = new Set([
+    "failed",
+    "stopped",
+    "incomplete",
+]);
 
 // ================== FORMAT MESSAGE TIME ==================
 function formatMessageTime(date) {
@@ -150,7 +162,6 @@ const markdownComponents = {
             return <pre>{children}</pre>;
         }
 
-        // ================== LANGUAGE ==================
         const rawClass = codeNode.properties?.className;
 
         const className = Array.isArray(rawClass)
@@ -161,7 +172,6 @@ const markdownComponents = {
             className.match(/language-([a-z0-9+#.-]+)/i)?.[1] ||
             "text";
 
-        // ================== CODE CONTENT ==================
         const codeText = (codeNode.children || [])
             .map((child) =>
                 child.type === "text" ? child.value : ""
@@ -281,13 +291,128 @@ const markdownComponents = {
     ),
 };
 
+// ================== DOCUMENT ATTACHMENTS ==================
+function MessageAttachments({
+    attachmentIds,
+    documentMap,
+}) {
+    if (
+        !Array.isArray(attachmentIds) ||
+        attachmentIds.length === 0
+    ) {
+        return null;
+    }
+
+    return (
+        <div
+            className="d-flex flex-wrap"
+            style={{
+                gap: 8,
+                marginBottom: 11,
+                maxWidth: "100%",
+            }}
+        >
+            {attachmentIds.map((documentId) => {
+                const id = String(documentId);
+                const document = documentMap[id];
+
+                const filename =
+                    document?.originalName ||
+                    "Attached document";
+
+                const fileType =
+                    document?.fileType ||
+                    (
+                        filename.toLowerCase().endsWith(".pdf")
+                            ? "pdf"
+                            : "docx"
+                    );
+
+                return (
+                    <div
+                        key={id}
+                        title={filename}
+                        className="d-flex align-items-center"
+                        style={{
+                            gap: 9,
+                            minWidth: 0,
+                            maxWidth: "100%",
+                            padding: "8px 11px",
+                            border: "1px solid #d9e3f0",
+                            borderRadius: 11,
+                            background: "#ffffff",
+                        }}
+                    >
+                        {/* ================== FILE ICON ================== */}
+                        <i
+                            className={
+                                fileType === "pdf"
+                                    ? "fa-regular fa-file-pdf"
+                                    : "fa-regular fa-file-word"
+                            }
+                            style={{
+                                color:
+                                    fileType === "pdf"
+                                        ? "#bb5364"
+                                        : "#376cbd",
+                                fontSize: 18,
+                                flexShrink: 0,
+                            }}
+                            aria-hidden="true"
+                        />
+
+                        {/* ================== FILE NAME ================== */}
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                minWidth: 0,
+                                maxWidth: 215,
+                            }}
+                        >
+                            <strong
+                                style={{
+                                    color: "#263d5a",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {filename}
+                            </strong>
+
+                            <small
+                                style={{
+                                    color: "#71839a",
+                                    fontSize: 10,
+                                }}
+                            >
+                                {fileType === "pdf"
+                                    ? "PDF Document"
+                                    : "Word Document"}
+                            </small>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ================== MESSAGE ITEM ==================
 const MessageItem = memo(function MessageItem({
     item,
+    documentMap,
     versionIndex,
     versionCount,
     onPrevious,
     onNext,
+    showActions = false,
+    actionsDisabled = false,
+    onRegenerate,
+    onRetry,
 }) {
     // ================== MESSAGE DETAILS ==================
     const isAssistant = item.role === "assistant";
@@ -309,6 +434,24 @@ const MessageItem = memo(function MessageItem({
             : item.provider === "gemini"
                 ? "Gemini"
                 : null;
+
+    // ================== RESPONSE ACTIONS ==================
+    const canRegenerate =
+        isAssistant &&
+        showActions &&
+        status === "completed" &&
+        typeof onRegenerate === "function";
+
+    const canRetry =
+        isAssistant &&
+        showActions &&
+        RETRYABLE_STATUSES.has(status) &&
+        typeof onRetry === "function";
+
+    const hasActions =
+        canRegenerate ||
+        canRetry ||
+        (isAssistant && versionCount > 1);
 
     return (
         <article
@@ -368,20 +511,38 @@ const MessageItem = memo(function MessageItem({
                             : ""
                     )
                 ) : (
-                    content
+                    <>
+                        {/* ================== UPLOADED FILE PREVIEW ================== */}
+                        <MessageAttachments
+                            attachmentIds={item.attachmentIds}
+                            documentMap={documentMap}
+                        />
+
+                        {/* ================== USER MESSAGE TEXT ================== */}
+                        <div
+                            style={{
+                                whiteSpace: "pre-wrap",
+                                overflowWrap: "anywhere",
+                            }}
+                        >
+                            {content}
+                        </div>
+                    </>
                 )}
             </div>
 
-            {/* ================== PROVIDER INFORMATION ================== */}
+            {/* ================== AI MODEL INFORMATION ================== */}
             {isAssistant && providerName && (
                 <span
                     style={{
                         padding: "0 4px",
-                        color: "#71839a",
+                        color: "#526780",
                         fontSize: "11px",
+                        fontWeight: 500,
                         overflowWrap: "anywhere",
                     }}
                 >
+                    <strong>Model: </strong>
                     {providerName}
                     {item.model ? ` · ${item.model}` : ""}
                 </span>
@@ -403,94 +564,171 @@ const MessageItem = memo(function MessageItem({
                     </span>
                 )}
 
-            {/* ================== RESPONSE VERSION NAVIGATION ================== */}
-            {isAssistant && versionCount > 1 && (
+            {/* ================== COMPACT RESPONSE ACTIONS ================== */}
+            {hasActions && (
                 <div
-                    className="chat-response-versions"
-                    role="group"
-                    aria-label="AI response versions"
                     style={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "flex-end",
-                        gap: "9px",
-                        padding: "5px 4px 0",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 10,
+                        padding: "8px 4px 0",
                     }}
                 >
-                    {/* ================== PREVIOUS VERSION ================== */}
-                    <button
-                        type="button"
-                        onClick={onPrevious}
-                        disabled={versionIndex === 0}
-                        aria-label="Previous AI response version"
-                        title="Previous response"
+                    {/* ================== RETRY / REGENERATE ================== */}
+                    <div
                         style={{
-                            display: "grid",
-                            placeItems: "center",
-                            width: "29px",
-                            height: "29px",
-                            border: "1px solid #dce5f0",
-                            borderRadius: "8px",
-                            background: "#ffffff",
-                            color: "#49688e",
-                            cursor: versionIndex === 0
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity: versionIndex === 0
-                                ? 0.4
-                                : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 7,
                         }}
                     >
-                        <i
-                            className="fa-solid fa-chevron-left"
-                            aria-hidden="true"
-                        />
-                    </button>
+                        {(canRegenerate || canRetry) && (
+                            <button
+                                type="button"
+                                disabled={actionsDisabled}
+                                onClick={
+                                    canRegenerate
+                                        ? onRegenerate
+                                        : onRetry
+                                }
+                                title={
+                                    canRegenerate
+                                        ? "Regenerate response"
+                                        : "Retry response"
+                                }
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 6,
+                                    minHeight: 27,
+                                    padding: "4px 9px",
+                                    border: "1px solid #dbe3ee",
+                                    borderRadius: 7,
+                                    background: "#ffffff",
+                                    color: "#61758f",
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    cursor: actionsDisabled
+                                        ? "not-allowed"
+                                        : "pointer",
+                                    opacity: actionsDisabled
+                                        ? 0.5
+                                        : 1,
+                                }}
+                            >
+                                <i
+                                    className="fa-solid fa-arrows-rotate"
+                                    aria-hidden="true"
+                                />
 
-                    {/* ================== VERSION COUNT ================== */}
-                    <span
-                        aria-live="polite"
-                        style={{
-                            minWidth: "43px",
-                            color: "#5e7594",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            textAlign: "center",
-                            fontVariantNumeric: "tabular-nums",
-                        }}
-                    >
-                        {versionIndex + 1} / {versionCount}
-                    </span>
+                                {canRegenerate
+                                    ? "Regenerate"
+                                    : "Retry"}
+                            </button>
+                        )}
+                    </div>
 
-                    {/* ================== NEXT VERSION ================== */}
-                    <button
-                        type="button"
-                        onClick={onNext}
-                        disabled={versionIndex === versionCount - 1}
-                        aria-label="Next AI response version"
-                        title="Next response"
-                        style={{
-                            display: "grid",
-                            placeItems: "center",
-                            width: "29px",
-                            height: "29px",
-                            border: "1px solid #dce5f0",
-                            borderRadius: "8px",
-                            background: "#ffffff",
-                            color: "#49688e",
-                            cursor: versionIndex === versionCount - 1
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity: versionIndex === versionCount - 1
-                                ? 0.4
-                                : 1,
-                        }}
-                    >
-                        <i
-                            className="fa-solid fa-chevron-right"
-                            aria-hidden="true"
-                        />
-                    </button>
+                    {/* ================== RESPONSE VERSION NAVIGATION ================== */}
+                    {isAssistant && versionCount > 1 && (
+                        <div
+                            className="chat-response-versions"
+                            role="group"
+                            aria-label="AI response versions"
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "flex-end",
+                                gap: 8,
+                                marginLeft: "auto",
+                            }}
+                        >
+                            {/* ================== PREVIOUS VERSION ================== */}
+                            <button
+                                type="button"
+                                onClick={onPrevious}
+                                disabled={versionIndex === 0}
+                                aria-label="Previous AI response version"
+                                title="Previous response"
+                                style={{
+                                    display: "grid",
+                                    placeItems: "center",
+                                    width: 27,
+                                    height: 27,
+                                    padding: 0,
+                                    border: "1px solid #dce5f0",
+                                    borderRadius: 7,
+                                    background: "#ffffff",
+                                    color: "#49688e",
+                                    cursor:
+                                        versionIndex === 0
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    opacity:
+                                        versionIndex === 0
+                                            ? 0.4
+                                            : 1,
+                                }}
+                            >
+                                <i
+                                    className="fa-solid fa-chevron-left"
+                                    aria-hidden="true"
+                                />
+                            </button>
+
+                            {/* ================== VERSION COUNT ================== */}
+                            <span
+                                aria-live="polite"
+                                style={{
+                                    minWidth: 40,
+                                    color: "#5e7594",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    textAlign: "center",
+                                    fontVariantNumeric: "tabular-nums",
+                                }}
+                            >
+                                {versionIndex + 1} / {versionCount}
+                            </span>
+
+                            {/* ================== NEXT VERSION ================== */}
+                            <button
+                                type="button"
+                                onClick={onNext}
+                                disabled={
+                                    versionIndex === versionCount - 1
+                                }
+                                aria-label="Next AI response version"
+                                title="Next response"
+                                style={{
+                                    display: "grid",
+                                    placeItems: "center",
+                                    width: 27,
+                                    height: 27,
+                                    padding: 0,
+                                    border: "1px solid #dce5f0",
+                                    borderRadius: 7,
+                                    background: "#ffffff",
+                                    color: "#49688e",
+                                    cursor:
+                                        versionIndex === versionCount - 1
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    opacity:
+                                        versionIndex === versionCount - 1
+                                            ? 0.4
+                                            : 1,
+                                }}
+                            >
+                                <i
+                                    className="fa-solid fa-chevron-right"
+                                    aria-hidden="true"
+                                />
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </article>
@@ -563,15 +801,102 @@ function MessageList({
     hasMore = false,
     loadingMore = false,
     onLoadMore,
+    onRegenerate,
+    onRetry,
+    actionsDisabled = false,
 }) {
-    // ================== SELECTED VERSIONS ==================
+    // ================== RESPONSE VERSION STATE ==================
     const [selectedVersions, setSelectedVersions] = useState({});
+
+    // ================== DOCUMENT METADATA ==================
+    const [documentMap, setDocumentMap] = useState({});
+
+    // ================== CONVERSATION ID ==================
+    const conversationId = messages.find(
+        (item) => item?.conversationId
+    )?.conversationId;
+
+    // ================== REFERENCED ATTACHMENTS ==================
+    const attachmentKey = messages
+        .filter((item) => item?.role === "user")
+        .flatMap(
+            (item) =>
+                Array.isArray(item.attachmentIds)
+                    ? item.attachmentIds.map(String)
+                    : []
+        )
+        .join(",");
+
+    // ================== LOAD DOCUMENT NAMES ==================
+    useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
+
+        setDocumentMap({});
+
+        if (!conversationId || !attachmentKey) {
+            return () => {
+                active = false;
+                controller.abort();
+            };
+        }
+
+        async function loadDocumentNames() {
+            try {
+                const response = await getDocuments(
+                    String(conversationId),
+                    {
+                        signal: controller.signal,
+                    }
+                );
+
+                if (!active) return;
+
+                const documents = Array.isArray(
+                    response?.documents
+                )
+                    ? response.documents
+                    : [];
+
+                const lookup = {};
+
+                for (const document of documents) {
+                    if (document?._id) {
+                        lookup[String(document._id)] = {
+                            originalName:
+                                document.originalName,
+                            fileType:
+                                document.fileType,
+                        };
+                    }
+                }
+
+                setDocumentMap(lookup);
+            } catch {
+                // Show a generic attachment label if
+                // document metadata is unavailable.
+            }
+        }
+
+        void loadDocumentNames();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [conversationId, attachmentKey]);
 
     // ================== GROUP MESSAGES ==================
     const displayItems = useMemo(
         () => groupMessageVersions(messages),
         [messages]
     );
+
+    // ================== LAST USER MESSAGE ==================
+    const lastUserMessageId = [...messages]
+        .reverse()
+        .find((item) => item.role === "user")
+        ?._id;
 
     // ================== SELECT RESPONSE VERSION ==================
     function selectVersion(replyId, versions, index) {
@@ -640,7 +965,8 @@ function MessageList({
                     savedSelection?.versionCount === versions.length
                         ? versions.findIndex(
                             (item) =>
-                                item._id === savedSelection.messageId
+                                String(item._id) ===
+                                String(savedSelection.messageId)
                         )
                         : -1;
 
@@ -650,12 +976,31 @@ function MessageList({
 
                 const currentMessage = versions[versionIndex];
 
+                const showActions =
+                    Boolean(replyId) &&
+                    String(replyId) ===
+                        String(lastUserMessageId) &&
+                    versionIndex === versions.length - 1;
+
                 return (
                     <MessageItem
                         key={group.key}
                         item={currentMessage}
+                        documentMap={documentMap}
                         versionIndex={versionIndex}
                         versionCount={versions.length}
+                        showActions={showActions}
+                        actionsDisabled={actionsDisabled}
+                        onRegenerate={
+                            showActions && onRegenerate
+                                ? () => onRegenerate(replyId)
+                                : undefined
+                        }
+                        onRetry={
+                            showActions && onRetry
+                                ? () => onRetry(replyId)
+                                : undefined
+                        }
                         onPrevious={() =>
                             selectVersion(
                                 replyId,

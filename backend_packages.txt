@@ -45,10 +45,11 @@ npm install @google/genai                                       # Gemini chat an
 npm install-scripts approve @google/genai protobufjs
 
 
-# ===== PDF / RAG / TOKEN BUDGET =====
+# ===== PDF / DOCX / RAG / TOKEN BUDGET =====
 
 npm install pdf-parse                                           # Extract text and page data from PDFs
 npm install js-tiktoken                                         # Approximate token counting for budgets/chunks
+npm install mammoth                                             # Extract text and page data from DOCXs
 
 
 # ===== RUN SCRIPTS SETUP =====

@@ -8,6 +8,7 @@ const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/authRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const documentRoutes = require("./routes/documentRoutes");
 
 const csrfMiddleware = require("./middleware/csrfMiddleware");
 const ExpressError = require("./utils/ExpressError");
@@ -45,7 +46,10 @@ if (
     throw new Error("CLIENT_ORIGIN must be a valid HTTP/HTTPS origin.");
 }
 
-if (process.env.NODE_ENV === "production" && clientUrl.protocol !== "https:") {
+if (
+    process.env.NODE_ENV === "production" &&
+    clientUrl.protocol !== "https:"
+) {
     throw new Error("CLIENT_ORIGIN must use HTTPS in production.");
 }
 
@@ -61,7 +65,9 @@ app.use(
                     "https://res.cloudinary.com",
                 ],
                 upgradeInsecureRequests:
-                    process.env.NODE_ENV === "production" ? [] : null,
+                    process.env.NODE_ENV === "production"
+                        ? []
+                        : null,
             },
         },
     })
@@ -72,14 +78,23 @@ app.use(
     cors({
         origin: clientOrigin,
         credentials: true,
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        methods: [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+        ],
         allowedHeaders: ["Content-Type"],
         exposedHeaders: ["Retry-After"],
     })
 );
 
 // ================== REQUEST BODY PARSING ==================
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({
+    limit: "100kb",
+}));
 
 // ================== COOKIE PARSING ==================
 app.use(cookieParser());
@@ -89,34 +104,43 @@ app.use("/api", csrfMiddleware);
 
 // ================== HEALTH CHECK ==================
 app.get("/api/health", (req, res) => {
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         message: "QueryNest AI API is running.",
     });
 });
 
-
-
-
 // ================== API ROUTES ==================
 app.use("/api/auth", authRoutes);
 app.use("/api/chats", chatRoutes);
-
-
-
-
+app.use("/api/documents", documentRoutes);
 
 // ================== FRONTEND SERVING ==================
 if (process.env.SERVE_FRONTEND === "true") {
-    const frontendPath = path.resolve(__dirname, "../frontend/dist");
-    const indexPath = path.join(frontendPath, "index.html");
+    const frontendPath = path.resolve(
+        __dirname,
+        "../frontend/dist"
+    );
+
+    const indexPath = path.join(
+        frontendPath,
+        "index.html"
+    );
 
     if (!existsSync(indexPath)) {
-        throw new Error("Build the frontend before enabling SERVE_FRONTEND.");
+        throw new Error(
+            "Build the frontend before enabling SERVE_FRONTEND."
+        );
     }
 
-    app.use(express.static(frontendPath, { index: false }));
+    // ================== STATIC FILES ==================
+    app.use(
+        express.static(frontendPath, {
+            index: false,
+        })
+    );
 
+    // ================== REACT ROUTER FALLBACK ==================
     app.get("/{*path}", (req, res, next) => {
         if (
             req.path === "/api" ||
@@ -135,7 +159,12 @@ if (process.env.SERVE_FRONTEND === "true") {
 
 // ================== ROUTE NOT FOUND ==================
 app.use((req, res, next) => {
-    next(new ExpressError(404, "Route not found."));
+    next(
+        new ExpressError(
+            404,
+            "Route not found."
+        )
+    );
 });
 
 // ================== ERROR HANDLER ==================

@@ -2,6 +2,7 @@
 import {
     useEffect,
     useLayoutEffect,
+    useMemo,
     useRef,
     useState,
 } from "react";
@@ -26,8 +27,17 @@ import {
     sendMessage,
 } from "../services/chatService";
 
+import {
+    uploadDocuments,
+    getDocuments,
+} from "../services/documentService";
+
 // ================== CONFIGURATION ==================
 const MESSAGE_LIMIT = 20;
+const MAX_DOCUMENTS = 3;
+const CHAT_MAX_WIDTH = 800;
+
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 const RETRYABLE_STATUSES = new Set([
     "failed",
@@ -35,35 +45,302 @@ const RETRYABLE_STATUSES = new Set([
     "incomplete",
 ]);
 
-// ================== ERROR MESSAGE ==================
-function getErrorMessage(error, fallback) {
+// ================== CANCELLED REQUEST ==================
+function isCancelledRequest(error) {
     return (
+        error?.name === "AbortError" ||
+        error?.name === "CanceledError" ||
+        error?.code === "ERR_CANCELED"
+    );
+}
+
+// ================== RETRY WAIT TIME ==================
+function getRetryWait(error) {
+    const data = error?.response?.data;
+
+    const seconds = Number(
+        data?.retryAfterSeconds ??
+        data?.retryAfter ??
+        error?.response?.headers?.["retry-after"]
+    );
+
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return "";
+    }
+
+    if (seconds < 60) {
+        return ` Please try again in ${Math.ceil(seconds)} seconds.`;
+    }
+
+    return ` Please try again in ${Math.ceil(seconds / 60)} minutes.`;
+}
+
+// ================== USER FRIENDLY ERROR ==================
+function getFriendlyError(error, fallback) {
+    const status = error?.response?.status;
+
+    const code = String(
+        error?.response?.data?.code ||
+        error?.code ||
+        ""
+    ).toUpperCase();
+
+    const details = String(
         error?.response?.data?.message ||
         error?.message ||
-        fallback
-    );
+        ""
+    ).toLowerCase();
+
+    const retryWait = getRetryWait(error);
+
+    // ================== AUTHENTICATION ==================
+    if (status === 401 || code === "SESSION_EXPIRED") {
+        return "Your session has expired. Please log in again.";
+    }
+
+    if (status === 403) {
+        return "You don't have permission to perform this action.";
+    }
+
+    if (status === 404) {
+        return "This conversation or document is no longer available.";
+    }
+
+    // ================== USER DAILY REQUEST LIMIT ==================
+    if (
+        code === "USER_DAILY_LIMIT" ||
+        code === "DAILY_REQUEST_LIMIT" ||
+        (
+            details.includes("daily") &&
+            details.includes("limit")
+        )
+    ) {
+        return "You've reached your daily AI request limit." +
+            retryWait;
+    }
+
+    // ================== USER PER-MINUTE LIMIT ==================
+    if (
+        code === "USER_MINUTE_LIMIT" ||
+        code === "MINUTE_REQUEST_LIMIT" ||
+        (
+            details.includes("per minute") &&
+            details.includes("limit")
+        )
+    ) {
+        return "You're sending requests too quickly." +
+            (retryWait || " Please try again shortly.");
+    }
+
+    // ================== PROVIDER TOKEN LIMIT ==================
+    if (
+        code === "PROVIDER_QUOTA_EXCEEDED" ||
+        code === "PROVIDER_TOKEN_LIMIT" ||
+        (
+            details.includes("token") &&
+            (
+                details.includes("quota") ||
+                details.includes("limit")
+            )
+        )
+    ) {
+        return "The AI service has reached its token or usage limit." +
+            (retryWait || " Please try again later.");
+    }
+
+    // ================== PROVIDER RATE LIMIT ==================
+    if (
+        code === "PROVIDER_RATE_LIMIT" ||
+        (
+            details.includes("provider") &&
+            details.includes("rate limit")
+        )
+    ) {
+        return "The AI service is receiving too many requests." +
+            (retryWait || " Please try again shortly.");
+    }
+
+    // ================== DOCUMENT LIMIT ==================
+    if (
+        code === "DOCUMENT_LIMIT" ||
+        code === "MAX_DOCUMENTS_EXCEEDED" ||
+        details.includes("maximum 3") ||
+        details.includes("supported document limit") ||
+        details.includes("up to 3 documents")
+    ) {
+        return "You can upload up to 3 documents per chat. Start a new chat to upload more.";
+    }
+
+    // ================== FILE SIZE ==================
+    if (
+        code === "FILE_TOO_LARGE" ||
+        (
+            details.includes("file") &&
+            details.includes("5 mb")
+        )
+    ) {
+        return "Each document must be smaller than 5 MB.";
+    }
+
+    if (status === 413) {
+        return "This document or request is too large. Please try a smaller one.";
+    }
+
+    // ================== DOCUMENT FORMAT ==================
+    if (
+        status === 415 ||
+        code === "UNSUPPORTED_FILE_TYPE" ||
+        details.includes("unsupported file")
+    ) {
+        return "Please upload a valid PDF or Word document.";
+    }
+
+    // ================== DOCUMENT EXTRACTION ==================
+    if (
+        code === "DOCUMENT_EXTRACTION_FAILED" ||
+        details.includes("no readable text") ||
+        details.includes("could not extract") ||
+        details.includes("no relevant text")
+    ) {
+        return "We couldn't read enough information from your document. Try another file or a more specific question.";
+    }
+
+    // ================== REQUEST TIMEOUT ==================
+    if (
+        code === "REQUEST_TIMEOUT" ||
+        code === "ECONNABORTED" ||
+        details.includes("timed out") ||
+        details.includes("timeout")
+    ) {
+        return "Your request took too long. Please try again.";
+    }
+
+    // ================== NETWORK ERROR ==================
+    if (
+        code === "ERR_NETWORK" ||
+        details.includes("failed to fetch") ||
+        details.includes("network error") ||
+        (
+            typeof navigator !== "undefined" &&
+            navigator.onLine === false
+        )
+    ) {
+        return "Connection lost. Please check your internet and try again.";
+    }
+
+    // ================== DUPLICATE GENERATION ==================
+    if (
+        details.includes("already in progress") ||
+        details.includes("response already exists")
+    ) {
+        return "This response is already being generated or has been completed.";
+    }
+
+    // ================== STREAM INTERRUPTED ==================
+    if (
+        [
+            "STREAM_INTERRUPTED",
+            "INVALID_STREAM_RESPONSE",
+            "STREAM_UNAVAILABLE",
+        ].includes(code)
+    ) {
+        return "The AI response was interrupted. Please try again.";
+    }
+
+    // ================== VERIFIED BACKEND VALIDATION ==================
+    if (
+        [
+            "REQUEST_REJECTED",
+            "GENERATION_CONFLICT",
+        ].includes(code) &&
+        status >= 400 &&
+        status < 500
+    ) {
+        const serverMessage =
+            error?.response?.data?.message;
+
+        if (
+            typeof serverMessage === "string" &&
+            serverMessage.trim() &&
+            serverMessage.length <= 250
+        ) {
+            return serverMessage.trim();
+        }
+
+        return "This request couldn't be completed. Please refresh the conversation and try again.";
+    }
+
+    // ================== REGENERATE CONFLICT ==================
+    if (status === 409) {
+        return "The response state has changed. Please refresh the conversation and try again.";
+    }
+
+    // ================== GENERAL RATE LIMIT ==================
+    if (status === 429) {
+        return "Too many requests right now." +
+            (retryWait || " Please try again later.");
+    }
+
+    // ================== SERVER FAILURE ==================
+    if (status >= 500) {
+        return "The AI service is temporarily unavailable. Please try again.";
+    }
+
+    return fallback;
+}
+
+// ================== TOAST HELPERS ==================
+function showError(message) {
+    toast.error(message, {
+        toastId: `chat-error:${message}`,
+    });
+}
+
+function showInfo(message) {
+    toast.info(message, {
+        toastId: `chat-info:${message}`,
+    });
+}
+
+// ================== HIDE CITATION MARKERS ==================
+function removeCitationMarkers(content) {
+    if (typeof content !== "string") {
+        return "";
+    }
+
+    return content
+        .replace(
+            /\s*\[(?:S\d+)(?:\s*[,;]\s*S\d+)*\]/gi,
+            ""
+        )
+        .replace(/[ \t]+([,.!?;:])/g, "$1");
 }
 
 // ================== CONVERSATION ==================
 function Conversation() {
     const { conversationId } = useParams();
+
     const location = useLocation();
     const navigate = useNavigate();
 
-    // ================== CONVERSATION STATE ==================
+    // ================== CHAT STATE ==================
     const [conversation, setConversation] = useState(null);
     const [messages, setMessages] = useState([]);
+
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
 
-    // ================== REQUEST STATE ==================
+    const [documentCount, setDocumentCount] = useState(null);
+    const [uploadProgress, setUploadProgress] = useState(null);
+
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [sending, setSending] = useState(false);
+
     const [queuePosition, setQueuePosition] = useState(null);
     const [error, setError] = useState("");
 
-    // ================== PAGINATION STATE ==================
+    // ================== PAGINATION ==================
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState(null);
     const [reloadKey, setReloadKey] = useState(0);
@@ -71,21 +348,33 @@ function Conversation() {
     // ================== REFERENCES ==================
     const messagesRef = useRef(null);
     const inputRef = useRef(null);
+
     const requestIdRef = useRef(null);
+    const pendingUploadRef = useRef(null);
+
     const busyRef = useRef(false);
+
     const streamControllerRef = useRef(null);
+    const uploadControllerRef = useRef(null);
+
     const autoStartedRef = useRef(null);
+
     const scrollToBottomRef = useRef(true);
     const restoreScrollRef = useRef(null);
+
     const conversationIdRef = useRef(conversationId);
 
-    // ================== STOP OLD STREAM ==================
+    // ================== CLEANUP REQUESTS ==================
     useEffect(() => {
         conversationIdRef.current = conversationId;
 
         return () => {
+            uploadControllerRef.current?.abort();
             streamControllerRef.current?.abort();
+
+            uploadControllerRef.current = null;
             streamControllerRef.current = null;
+
             busyRef.current = false;
         };
     }, [conversationId]);
@@ -99,6 +388,8 @@ function Conversation() {
             setError("");
             setConversation(null);
             setMessages([]);
+
+            setDocumentCount(null);
             setHasMore(false);
             setNextCursor(null);
             setQueuePosition(null);
@@ -108,35 +399,66 @@ function Conversation() {
             restoreScrollRef.current = null;
 
             try {
-                const [conversationData, messageData] =
-                    await Promise.all([
-                        getConversation(conversationId),
-                        getMessageHistory(conversationId, {
-                            limit: MESSAGE_LIMIT,
-                        }),
-                    ]);
+                const [
+                    conversationResponse,
+                    messageResponse,
+                    documentResponse,
+                ] = await Promise.all([
+                    getConversation(conversationId),
+
+                    getMessageHistory(conversationId, {
+                        limit: MESSAGE_LIMIT,
+                    }),
+
+                    getDocuments(conversationId).catch(
+                        () => null
+                    ),
+                ]);
 
                 if (!active) return;
 
-                setConversation(conversationData.conversation);
-                setMessages(messageData.messages || []);
+                // ================== SAVE CHAT DETAILS ==================
+                setConversation(
+                    conversationResponse.conversation
+                );
 
+                setMessages(
+                    messageResponse.messages || []
+                );
+
+                // ================== PAGINATION ==================
                 setHasMore(
-                    Boolean(messageData.pagination?.hasMore)
+                    Boolean(messageResponse.pagination?.hasMore)
                 );
 
                 setNextCursor(
-                    messageData.pagination?.nextCursor || null
+                    messageResponse.pagination?.nextCursor || null
                 );
-            } catch (error) {
+
+                // ================== DOCUMENT COUNT ==================
+                if (Array.isArray(documentResponse?.documents)) {
+                    setDocumentCount(
+                        documentResponse.documents.length
+                    );
+                } else {
+                    setDocumentCount(null);
+
+                    showInfo(
+                        "We couldn't check your uploaded files. You can still continue chatting."
+                    );
+                }
+
+            } catch (loadError) {
                 if (!active) return;
 
-                setError(
-                    getErrorMessage(
-                        error,
-                        "Unable to load conversation."
-                    )
+                const friendlyMessage = getFriendlyError(
+                    loadError,
+                    "Couldn't open this conversation. Please try again."
                 );
+
+                setError(friendlyMessage);
+                showError(friendlyMessage);
+
             } finally {
                 if (active) {
                     setLoading(false);
@@ -144,21 +466,38 @@ function Conversation() {
             }
         }
 
-        loadConversation();
+        void loadConversation();
 
         return () => {
             active = false;
         };
     }, [conversationId, reloadKey]);
 
-    // ================== RESET CHAT DRAFT ==================
+    // ================== RESET DRAFT ==================
     useEffect(() => {
         setMessage("");
         setAttachments([]);
+        setUploadProgress(null);
 
         requestIdRef.current = null;
+        pendingUploadRef.current = null;
         autoStartedRef.current = null;
     }, [conversationId]);
+
+    // ================== USER VISIBLE MESSAGES ==================
+    const visibleMessages = useMemo(() => {
+        return messages.map((item) => {
+            if (item.role !== "assistant") {
+                return item;
+            }
+
+            return {
+                ...item,
+                content: removeCitationMarkers(item.content),
+                sources: [],
+            };
+        });
+    }, [messages]);
 
     // ================== SCROLL MANAGEMENT ==================
     useLayoutEffect(() => {
@@ -166,10 +505,8 @@ function Conversation() {
 
         if (!container) return;
 
-        // ================== RESTORE SCROLL ==================
         if (restoreScrollRef.current) {
-            const { height, top } =
-                restoreScrollRef.current;
+            const { height, top } = restoreScrollRef.current;
 
             container.scrollTop =
                 container.scrollHeight - height + top;
@@ -178,14 +515,13 @@ function Conversation() {
             return;
         }
 
-        // ================== SCROLL TO BOTTOM ==================
         if (scrollToBottomRef.current) {
             container.scrollTop = container.scrollHeight;
             scrollToBottomRef.current = false;
         }
     }, [messages]);
 
-    // ================== CHECK SCROLL POSITION ==================
+    // ================== SCROLL POSITION ==================
     function markScrollIfNearBottom() {
         const container = messagesRef.current;
 
@@ -207,16 +543,25 @@ function Conversation() {
             return;
         }
 
+        const activeConversationId = conversationId;
+
         setLoadingMore(true);
 
         try {
             const response = await getMessageHistory(
-                conversationId,
+                activeConversationId,
                 {
                     before: nextCursor,
                     limit: MESSAGE_LIMIT,
                 }
             );
+
+            if (
+                conversationIdRef.current !==
+                activeConversationId
+            ) {
+                return;
+            }
 
             const olderMessages = response.messages || [];
             const container = messagesRef.current;
@@ -228,7 +573,7 @@ function Conversation() {
                 };
             }
 
-            // ================== MERGE MESSAGES ==================
+            // ================== MERGE HISTORY ==================
             setMessages((current) => {
                 const existingIds = new Set(
                     current.map((item) => item._id)
@@ -238,10 +583,7 @@ function Conversation() {
                     (item) => !existingIds.has(item._id)
                 );
 
-                return [
-                    ...uniqueMessages,
-                    ...current,
-                ];
+                return [...uniqueMessages, ...current];
             });
 
             setHasMore(
@@ -251,15 +593,27 @@ function Conversation() {
             setNextCursor(
                 response.pagination?.nextCursor || null
             );
-        } catch (error) {
-            toast.error(
-                getErrorMessage(
-                    error,
-                    "Unable to load earlier messages."
-                )
-            );
+
+        } catch (loadError) {
+            if (
+                conversationIdRef.current ===
+                activeConversationId
+            ) {
+                showError(
+                    getFriendlyError(
+                        loadError,
+                        "Couldn't load earlier messages. Please try again."
+                    )
+                );
+            }
+
         } finally {
-            setLoadingMore(false);
+            if (
+                conversationIdRef.current ===
+                activeConversationId
+            ) {
+                setLoadingMore(false);
+            }
         }
     }
 
@@ -287,7 +641,6 @@ function Conversation() {
                     signal: controller.signal,
                     regenerate,
 
-                    // ================== HANDLE STREAM EVENTS ==================
                     onEvent: ({ type, data }) => {
                         if (
                             controller.signal.aborted ||
@@ -297,7 +650,7 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== QUEUED ==================
+                        // ================== REQUEST QUEUED ==================
                         if (type === "queued") {
                             setQueuePosition(
                                 data?.position || 1
@@ -305,23 +658,23 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== START ==================
+                        // ================== RESPONSE START ==================
                         if (
                             type === "start" &&
                             data?.messageId
                         ) {
                             assistantMessageId = data.messageId;
-
                             setQueuePosition(null);
+
                             markScrollIfNearBottom();
 
                             setMessages((current) => {
-                                const exists = current.some(
-                                    (item) =>
-                                        item._id === data.messageId
-                                );
-
-                                if (exists) {
+                                if (
+                                    current.some(
+                                        (item) =>
+                                            item._id === data.messageId
+                                    )
+                                ) {
                                     return current;
                                 }
 
@@ -329,15 +682,21 @@ function Conversation() {
                                     ...current,
                                     {
                                         _id: data.messageId,
+
                                         conversationId:
                                             activeConversationId,
+
                                         replyToMessageId:
                                             userMessageId,
+
                                         role: "assistant",
                                         content: "",
                                         status: "queued",
+
                                         provider: null,
                                         model: null,
+                                        sources: [],
+
                                         createdAt:
                                             new Date().toISOString(),
                                     },
@@ -347,7 +706,7 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== PROVIDER ==================
+                        // ================== AI PROVIDER ==================
                         if (
                             type === "provider" &&
                             assistantMessageId
@@ -356,13 +715,13 @@ function Conversation() {
                                 current.map((item) =>
                                     item._id === assistantMessageId
                                         ? {
-                                              ...item,
-                                              provider:
-                                                  data?.provider || null,
-                                              model:
-                                                  data?.model || null,
-                                              status: "streaming",
-                                          }
+                                            ...item,
+                                            provider:
+                                                data?.provider || null,
+                                            model:
+                                                data?.model || null,
+                                            status: "streaming",
+                                        }
                                         : item
                                 )
                             );
@@ -370,7 +729,32 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== RESPONSE DELTA ==================
+                        // ================== INTERNAL SOURCES ==================
+                        if (
+                            type === "sources" &&
+                            assistantMessageId
+                        ) {
+                            const sources = Array.isArray(
+                                data?.sources
+                            )
+                                ? data.sources
+                                : [];
+
+                            setMessages((current) =>
+                                current.map((item) =>
+                                    item._id === assistantMessageId
+                                        ? {
+                                            ...item,
+                                            sources,
+                                        }
+                                        : item
+                                )
+                            );
+
+                            return;
+                        }
+
+                        // ================== STREAM TEXT ==================
                         if (
                             type === "delta" &&
                             assistantMessageId
@@ -389,11 +773,11 @@ function Conversation() {
                                 current.map((item) =>
                                     item._id === assistantMessageId
                                         ? {
-                                              ...item,
-                                              content:
-                                                  item.content + text,
-                                              status: "streaming",
-                                          }
+                                            ...item,
+                                            content:
+                                                item.content + text,
+                                            status: "streaming",
+                                        }
                                         : item
                                 )
                             );
@@ -401,7 +785,7 @@ function Conversation() {
                             return;
                         }
 
-                        // ================== COMPLETE ==================
+                        // ================== STREAM DONE ==================
                         if (
                             type === "done" &&
                             assistantMessageId
@@ -412,17 +796,24 @@ function Conversation() {
                                 current.map((item) =>
                                     item._id === assistantMessageId
                                         ? {
-                                              ...item,
-                                              status:
-                                                  data?.status ||
-                                                  "incomplete",
-                                              provider:
-                                                  data?.provider ||
-                                                  item.provider,
-                                              model:
-                                                  data?.model ||
-                                                  item.model,
-                                          }
+                                            ...item,
+                                            status:
+                                                data?.status ||
+                                                "incomplete",
+
+                                            provider:
+                                                data?.provider ||
+                                                item.provider,
+
+                                            model:
+                                                data?.model ||
+                                                item.model,
+
+                                            sources:
+                                                Array.isArray(data?.sources)
+                                                    ? data.sources
+                                                    : item.sources || [],
+                                        }
                                         : item
                                 )
                             );
@@ -430,48 +821,51 @@ function Conversation() {
                     },
                 }
             );
-        } catch (error) {
+
+        } catch (streamError) {
             const stopped = controller.signal.aborted;
 
-            // ================== UPDATE FAILED MESSAGE ==================
+            // ================== UPDATE RESPONSE STATUS ==================
             if (
                 assistantMessageId &&
-                conversationIdRef.current ===
-                    activeConversationId
+                conversationIdRef.current === activeConversationId
             ) {
                 setMessages((current) =>
                     current.map((item) =>
                         item._id === assistantMessageId &&
                         !finished
                             ? {
-                                  ...item,
-                                  status: stopped
-                                      ? "stopped"
-                                      : assistantHasContent
+                                ...item,
+                                status: stopped
+                                    ? "stopped"
+                                    : assistantHasContent
                                         ? "incomplete"
                                         : "failed",
-                              }
+                            }
                             : item
                     )
                 );
             }
 
-            // ================== ERROR NOTIFICATION ==================
+            // ================== SHOW VERIFIED ERROR ==================
             if (
                 !stopped &&
-                conversationIdRef.current ===
-                    activeConversationId
+                conversationIdRef.current === activeConversationId
             ) {
-                toast.error(
-                    getErrorMessage(
-                        error,
-                        "AI generation failed. Please retry."
+                showError(
+                    getFriendlyError(
+                        streamError,
+                        regenerate
+                            ? "Couldn't regenerate the response. Please try again."
+                            : "Couldn't generate a response. Please try again."
                     )
                 );
             }
+
         } finally {
-            // ================== CLEANUP ==================
-            if (streamControllerRef.current === controller) {
+            if (
+                streamControllerRef.current === controller
+            ) {
                 streamControllerRef.current = null;
                 setQueuePosition(null);
             }
@@ -480,13 +874,32 @@ function Conversation() {
 
     // ================== MESSAGE INPUT ==================
     function handleMessageChange(event) {
+        if (busyRef.current) return;
+
         setMessage(event.target.value);
+
         requestIdRef.current = null;
+        pendingUploadRef.current = null;
     }
 
     // ================== ATTACHMENTS ==================
     function handleAttachmentsChange(files) {
+        if (busyRef.current) return;
+
         setAttachments(files);
+
+        requestIdRef.current = null;
+        pendingUploadRef.current = null;
+    }
+
+    // ================== CANCEL ACTIVE REQUEST ==================
+    function handleStopRequest() {
+        if (uploadControllerRef.current) {
+            uploadControllerRef.current.abort();
+            return;
+        }
+
+        streamControllerRef.current?.abort();
     }
 
     // ================== SEND MESSAGE ==================
@@ -501,40 +914,156 @@ function Conversation() {
             return;
         }
 
-        const content = message.trim();
+        const selectedFiles = [...attachments];
 
-        if (!content && !attachments.length) {
-            return;
-        }
+        const content = message.trim() ||
+            (
+                selectedFiles.length
+                    ? "Please summarize the attached document(s)."
+                    : ""
+            );
 
-        // ================== DOCUMENTS PENDING ==================
-        if (attachments.length > 0) {
-            toast.info(
-                "PDF and Word document sending will be available after upload integration."
+        if (!content) return;
+
+        // ================== DOCUMENT LIMIT ==================
+        if (
+            selectedFiles.length &&
+            documentCount !== null &&
+            documentCount + selectedFiles.length >
+                MAX_DOCUMENTS
+        ) {
+            showError(
+                "You can upload up to 3 documents per chat. Start a new chat to upload more."
             );
             return;
         }
 
+        const activeConversationId = conversationId;
+
         busyRef.current = true;
         setSending(true);
 
-        const activeConversationId = conversationId;
-
         try {
-            // ================== REQUEST ID ==================
+            // ================== REQUEST IDENTIFIER ==================
             if (!requestIdRef.current) {
                 requestIdRef.current =
                     generateChatRequestId();
+            }
+
+            const clientRequestId =
+                requestIdRef.current;
+
+            // ================== PREVIOUS SUCCESSFUL UPLOAD ==================
+            let messageAttachmentIds =
+                pendingUploadRef.current?.content === content
+                    ? pendingUploadRef.current.documentIds
+                    : [];
+
+            // ================== UPLOAD NEW FILES ==================
+            if (selectedFiles.length) {
+                const controller = new AbortController();
+
+                uploadControllerRef.current = controller;
+                setUploadProgress(0);
+
+                let uploaded;
+
+                try {
+                    uploaded = await uploadDocuments(
+                        selectedFiles,
+                        {
+                            conversationId:
+                                activeConversationId,
+
+                            signal:
+                                controller.signal,
+
+                            onUploadProgress:
+                                (progress) => {
+                                    if (
+                                        !controller.signal.aborted &&
+                                        conversationIdRef.current ===
+                                            activeConversationId
+                                    ) {
+                                        setUploadProgress(progress);
+                                    }
+                                },
+                        }
+                    );
+
+                } finally {
+                    if (
+                        uploadControllerRef.current === controller
+                    ) {
+                        uploadControllerRef.current = null;
+                    }
+
+                    setUploadProgress(null);
+                }
+
+                if (
+                    conversationIdRef.current !==
+                    activeConversationId
+                ) {
+                    return;
+                }
+
+                // ================== VERIFY UPLOADED DOCUMENTS ==================
+                const newDocuments = uploaded?.documents || [];
+
+                const newIds = newDocuments.map(
+                    (document) => document._id
+                );
+
+                if (
+                    newIds.length !== selectedFiles.length ||
+                    newIds.some(
+                        (id) =>
+                            typeof id !== "string" ||
+                            !OBJECT_ID_PATTERN.test(id)
+                    ) ||
+                    new Set(newIds).size !== newIds.length
+                ) {
+                    throw new Error(
+                        "Uploaded document information is incomplete."
+                    );
+                }
+
+                // ================== PRESERVE UPLOAD FOR RETRY ==================
+                messageAttachmentIds = newIds;
+
+                pendingUploadRef.current = {
+                    content,
+                    documentIds: newIds,
+                };
+
+                setDocumentCount((current) =>
+                    current === null
+                        ? null
+                        : current + newIds.length
+                );
+
+                setAttachments([]);
+                setMessage(content);
+            }
+
+            if (
+                conversationIdRef.current !==
+                activeConversationId
+            ) {
+                return;
             }
 
             // ================== SAVE USER MESSAGE ==================
             const response = await sendMessage(
                 activeConversationId,
                 content,
-                requestIdRef.current
+                clientRequestId,
+                messageAttachmentIds
             );
 
-            const savedMessage = response.userMessage;
+            const savedMessage =
+                response?.userMessage;
 
             if (!savedMessage?._id) {
                 throw new Error(
@@ -549,43 +1078,52 @@ function Conversation() {
                 return;
             }
 
-            // ================== UPDATE CHAT ==================
+            // ================== UPDATE MESSAGE HISTORY ==================
             scrollToBottomRef.current = true;
 
             setMessages((current) => {
-                const alreadyExists = current.some(
-                    (item) =>
-                        item._id === savedMessage._id
-                );
-
-                if (alreadyExists) {
+                if (
+                    current.some(
+                        (item) =>
+                            item._id === savedMessage._id
+                    )
+                ) {
                     return current;
                 }
 
-                return [
-                    ...current,
-                    savedMessage,
-                ];
+                return [...current, savedMessage];
             });
 
-            // ================== RESET INPUT ==================
+            // ================== CLEAR COMPOSER ==================
             setMessage("");
-            requestIdRef.current = null;
+            setAttachments([]);
 
-            // ================== START AI RESPONSE ==================
+            requestIdRef.current = null;
+            pendingUploadRef.current = null;
+
+            // ================== GENERATE AI RESPONSE ==================
             await runAIStream(savedMessage._id);
-        } catch (error) {
+
+        } catch (sendError) {
             if (
                 conversationIdRef.current ===
                 activeConversationId
             ) {
-                toast.error(
-                    getErrorMessage(
-                        error,
-                        "Unable to send message. Please retry."
-                    )
-                );
+                if (isCancelledRequest(sendError)) {
+                    showInfo(
+                        "Document upload cancelled."
+                    );
+
+                } else {
+                    showError(
+                        getFriendlyError(
+                            sendError,
+                            "Couldn't send your message. Please try again."
+                        )
+                    );
+                }
             }
+
         } finally {
             if (
                 conversationIdRef.current ===
@@ -604,9 +1142,7 @@ function Conversation() {
         userMessageId,
         { regenerate = false } = {}
     ) {
-        if (busyRef.current || loading) {
-            return;
-        }
+        if (busyRef.current || loading) return;
 
         busyRef.current = true;
         setSending(true);
@@ -614,9 +1150,11 @@ function Conversation() {
         const activeConversationId = conversationId;
 
         try {
-            await runAIStream(userMessageId, {
-                regenerate,
-            });
+            await runAIStream(
+                userMessageId,
+                { regenerate }
+            );
+
         } finally {
             if (
                 conversationIdRef.current ===
@@ -624,8 +1162,26 @@ function Conversation() {
             ) {
                 busyRef.current = false;
                 setSending(false);
+
+                inputRef.current?.focus();
             }
         }
+    }
+
+    // ================== COMPACT REGENERATE ==================
+    function handleRegenerate(userMessageId) {
+        void handleGenerateSavedMessage(
+            userMessageId,
+            { regenerate: true }
+        );
+    }
+
+    // ================== COMPACT RETRY ==================
+    function handleRetry(userMessageId) {
+        void handleGenerateSavedMessage(
+            userMessageId,
+            { regenerate: false }
+        );
     }
 
     // ================== INITIAL CHAT HANDOFF ==================
@@ -648,10 +1204,11 @@ function Conversation() {
             return;
         }
 
-        // ================== FIND CURRENT MESSAGE ==================
         const latestUser = [...messages]
             .reverse()
-            .find((item) => item.role === "user");
+            .find(
+                (item) => item.role === "user"
+            );
 
         if (
             !latestUser ||
@@ -662,13 +1219,11 @@ function Conversation() {
 
         autoStartedRef.current = key;
 
-        // ================== CLEAR NAVIGATION STATE ==================
         navigate(location.pathname, {
             replace: true,
             state: null,
         });
 
-        // ================== CHECK EXISTING RESPONSE ==================
         const existingReply = messages.some(
             (item) =>
                 item.role === "assistant" &&
@@ -679,6 +1234,7 @@ function Conversation() {
         if (!existingReply) {
             void handleGenerateSavedMessage(pendingId);
         }
+
     }, [
         conversationId,
         conversation,
@@ -693,39 +1249,31 @@ function Conversation() {
     // ================== LATEST USER MESSAGE ==================
     const lastUserMessage = [...messages]
         .reverse()
-        .find((item) => item.role === "user");
+        .find(
+            (item) => item.role === "user"
+        );
 
     // ================== LATEST AI RESPONSE ==================
     const lastReply = lastUserMessage
         ? [...messages]
-              .reverse()
-              .find(
-                  (item) =>
-                      item.role === "assistant" &&
-                      item.replyToMessageId ===
-                          lastUserMessage._id
-              )
+            .reverse()
+            .find(
+                (item) =>
+                    item.role === "assistant" &&
+                    item.replyToMessageId ===
+                        lastUserMessage._id
+            )
         : null;
 
-    // ================== GENERATE / RETRY AVAILABILITY ==================
-    const canGenerateReply = Boolean(
+    // ================== MISSING RESPONSE ==================
+    const canGenerateMissingReply = Boolean(
         lastUserMessage &&
-        !sending &&
-        (
-            !lastReply ||
-            RETRYABLE_STATUSES.has(lastReply.status)
-        )
-    );
-
-    // ================== REGENERATE AVAILABILITY ==================
-    const canRegenerateReply = Boolean(
-        lastUserMessage &&
-        lastReply?.status === "completed" &&
+        !lastReply &&
         !sending &&
         !loading
     );
 
-    // ================== LOADING ==================
+    // ================== LOADING SCREEN ==================
     if (loading) {
         return (
             <div
@@ -742,7 +1290,7 @@ function Conversation() {
         );
     }
 
-    // ================== ERROR ==================
+    // ================== ERROR SCREEN ==================
     if (error || !conversation) {
         return (
             <div className="conversation-feedback">
@@ -754,7 +1302,8 @@ function Conversation() {
                 <h2>Conversation unavailable</h2>
 
                 <p>
-                    {error || "Conversation not found."}
+                    {error ||
+                        "This conversation is unavailable."}
                 </p>
 
                 <button
@@ -779,6 +1328,7 @@ function Conversation() {
         );
     }
 
+    // ================== CHAT INTERFACE ==================
     return (
         <section
             className="conversation-page"
@@ -797,117 +1347,162 @@ function Conversation() {
                 className="conversation-messages"
                 role="log"
                 aria-label="Conversation messages"
+                style={{
+                    padding:
+                        "26px clamp(12px, 3vw, 28px) 20px",
+                }}
             >
-                <MessageList
-                    messages={messages}
-                    hasMore={hasMore}
-                    loadingMore={loadingMore}
-                    onLoadMore={handleLoadMore}
-                />
+                <div
+                    style={{
+                        width: "100%",
+                        maxWidth: CHAT_MAX_WIDTH,
+                        margin: "0 auto",
+                        minWidth: 0,
+                    }}
+                >
+                    {/* ================== CHAT MESSAGES ================== */}
+                    <MessageList
+                        messages={visibleMessages}
+                        hasMore={hasMore}
+                        loadingMore={loadingMore}
+                        onLoadMore={handleLoadMore}
+                        onRegenerate={handleRegenerate}
+                        onRetry={handleRetry}
+                        actionsDisabled={sending || loading}
+                    />
+
+                    {/* ================== NO RESPONSE FALLBACK ================== */}
+                    {canGenerateMissingReply && (
+                        <div
+                            className="d-flex justify-content-start mt-3"
+                        >
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() =>
+                                    handleGenerateSavedMessage(
+                                        lastUserMessage._id
+                                    )
+                                }
+                                style={{
+                                    fontSize: 11,
+                                    padding: "5px 10px",
+                                    borderRadius: 7,
+                                }}
+                            >
+                                <i
+                                    className="fa-solid fa-rotate-right me-2"
+                                    aria-hidden="true"
+                                />
+
+                                Generate Response
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* ================== STREAM CONTROLS ================== */}
-            <div className="conversation-composer-wrap">
+            {/* ================== COMPACT COMPOSER ================== */}
+            <div
+                className="conversation-composer-wrap"
+                style={{
+                    padding:
+                        "10px clamp(12px, 3vw, 28px) 14px",
+                }}
+            >
+                <div
+                    style={{
+                        width: "100%",
+                        maxWidth: CHAT_MAX_WIDTH,
+                        margin: "0 auto",
+                    }}
+                >
+                    {/* ================== UPLOAD PROGRESS ================== */}
+                    {uploadProgress !== null && (
+                        <div
+                            className="d-flex align-items-center justify-content-between gap-3 mb-2 px-2"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <span className="small text-secondary">
+                                {uploadProgress < 100
+                                    ? `Uploading: ${uploadProgress}%`
+                                    : "Processing your document..."}
+                            </span>
 
-                {/* ================== STOP GENERATION ================== */}
-                {sending && (
-                    <div
-                        className="conversation-load-more"
-                        role="status"
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-link text-secondary p-0"
+                                onClick={handleStopRequest}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ================== STREAMING CONTROLS ================== */}
+                    {sending &&
+                        uploadProgress === null && (
+                            <div
+                                className="d-flex justify-content-center mb-2"
+                                role="status"
+                            >
+                                {queuePosition && (
+                                    <span className="small text-secondary me-3">
+                                        Waiting in queue:
+                                        {" "}
+                                        {queuePosition}
+                                    </span>
+                                )}
+
+                                {streamControllerRef.current && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={handleStopRequest}
+                                    >
+                                        <i
+                                            className="fa-solid fa-stop me-1"
+                                            aria-hidden="true"
+                                        />
+
+                                        Stop Generating
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                    {/* ================== MESSAGE COMPOSER ================== */}
+                    <MessageComposer
+                        inputId="conversation-message"
+                        inputRef={inputRef}
+                        value={message}
+                        onChange={handleMessageChange}
+                        attachments={attachments}
+                        onAttachmentsChange={
+                            handleAttachmentsChange
+                        }
+                        onSubmit={handleSubmit}
+                        placeholder="Message QueryNest AI..."
+                        sending={sending}
+                    />
+
+                    {/* ================== DISCLAIMER ================== */}
+                    <p
+                        className="chat-dashboard-note"
+                        style={{
+                            marginTop: 8,
+                            marginBottom: 0,
+                            textAlign: "center",
+                        }}
                     >
-                        <button
-                            type="button"
-                            onClick={() =>
-                                streamControllerRef.current?.abort()
-                            }
-                            disabled={!streamControllerRef.current}
-                        >
-                            <i
-                                className="fa-solid fa-stop"
-                                aria-hidden="true"
-                            />
-                            {" "}
-                            Stop Generation
-
-                            {queuePosition
-                                ? ` · Queue #${queuePosition}`
-                                : ""}
-                        </button>
-                    </div>
-                )}
-
-                {/* ================== RETRY AI RESPONSE ================== */}
-                {canGenerateReply && (
-                    <div className="conversation-load-more">
-                        <button
-                            type="button"
-                            onClick={() =>
-                                handleGenerateSavedMessage(
-                                    lastUserMessage._id
-                                )
-                            }
-                        >
-                            <i
-                                className="fa-solid fa-rotate-right"
-                                aria-hidden="true"
-                            />
-                            {" "}
-                            {lastReply
-                                ? "Retry AI Response"
-                                : "Generate AI Response"}
-                        </button>
-                    </div>
-                )}
-
-                {/* ================== REGENERATE AI RESPONSE ================== */}
-                {canRegenerateReply && (
-                    <div className="conversation-load-more">
-                        <button
-                            type="button"
-                            onClick={() =>
-                                handleGenerateSavedMessage(
-                                    lastUserMessage._id,
-                                    {
-                                        regenerate: true,
-                                    }
-                                )
-                            }
-                            aria-label="Regenerate AI response"
-                        >
-                            <i
-                                className="fa-solid fa-arrows-rotate"
-                                aria-hidden="true"
-                            />
-                            {" "}
-                            Regenerate Response
-                        </button>
-                    </div>
-                )}
-
-                {/* ================== MESSAGE COMPOSER ================== */}
-                <MessageComposer
-                    inputId="conversation-message"
-                    inputRef={inputRef}
-                    value={message}
-                    onChange={handleMessageChange}
-                    attachments={attachments}
-                    onAttachmentsChange={
-                        handleAttachmentsChange
-                    }
-                    onSubmit={handleSubmit}
-                    placeholder="Message QueryNest AI..."
-                    sending={sending}
-                />
-
-                {/* ================== FOOTNOTE ================== */}
-                <p className="chat-dashboard-note">
-                    QueryNest AI can make mistakes.
-                    Verify important information.
-                </p>
+                        QueryNest AI can make mistakes.
+                        Verify important information.
+                    </p>
+                </div>
             </div>
         </section>
     );
 }
 
-// ================== EXPORT ==================
 export default Conversation;

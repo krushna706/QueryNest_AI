@@ -1,5 +1,5 @@
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -8,8 +8,13 @@ import MessageComposer from "../components/chat/MessageComposer";
 
 import {
     createConversation,
+    sendMessage,
     generateChatRequestId,
 } from "../services/chatService";
+
+import {
+    uploadDocuments,
+} from "../services/documentService";
 
 // ================== STARTER PROMPTS ==================
 const starterPrompts = [
@@ -39,34 +44,61 @@ const starterPrompts = [
     },
 ];
 
+// ================== DOCUMENT SETTINGS ==================
+const MAX_DOCUMENTS = 3;
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+// ================== ERROR MESSAGE ==================
+function getErrorMessage(error, fallback) {
+    return (
+        error?.response?.data?.message ||
+        error?.message ||
+        fallback
+    );
+}
+
 // ================== CHAT DASHBOARD ==================
 function ChatDashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    // ================== STATE ==================
+    // ================== COMPOSER STATE ==================
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
     const [sending, setSending] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(null);
 
     // ================== REFERENCES ==================
     const inputRef = useRef(null);
     const sendingRef = useRef(false);
     const requestIdRef = useRef(null);
+    const uploadControllerRef = useRef(null);
 
-    // ================== USER NAME ==================
     const firstName =
         user?.name?.trim().split(/\s+/)[0] || "there";
 
+    // ================== CLEANUP UPLOAD ==================
+    useEffect(() => {
+        return () => {
+            uploadControllerRef.current?.abort();
+            uploadControllerRef.current = null;
+        };
+    }, []);
+
     // ================== MESSAGE INPUT ==================
     const handleMessageChange = (event) => {
+        if (sendingRef.current) return;
+
         setMessage(event.target.value);
         requestIdRef.current = null;
     };
 
     // ================== ATTACHMENTS ==================
     const handleAttachmentsChange = (files) => {
+        if (sendingRef.current) return;
+
         setAttachments(files);
+        requestIdRef.current = null;
     };
 
     // ================== STARTER PROMPT ==================
@@ -79,96 +111,280 @@ function ChatDashboard() {
         inputRef.current?.focus();
     };
 
-    // ================== CREATE CONVERSATION ==================
-    const handleSubmit = async (event) => {
-        event.preventDefault();
+    // ================== CANCEL UPLOAD ==================
+    const handleCancelUpload = () => {
+        uploadControllerRef.current?.abort();
+    };
 
-        // ================== PREVENT DUPLICATE SUBMIT ==================
-        if (sendingRef.current) return;
+    // ================== NAVIGATE TO CONVERSATION ==================
+    const openConversation = (
+        conversationId,
+        initialMessageId = null
+    ) => {
+        navigate(`/chat/${conversationId}`, {
+            replace: true,
+            state: initialMessageId
+                ? {
+                    autoGenerateMessageId: initialMessageId,
+                }
+                : null,
+        });
+    };
 
-        const content = message.trim();
+    // ================== CREATE NORMAL CHAT ==================
+    const createNormalChat = async (
+        content,
+        clientRequestId
+    ) => {
+        const response = await createConversation(
+            content,
+            clientRequestId
+        );
 
-        if (!content && !attachments.length) {
+        const conversationId = response?.conversation?._id;
+
+        if (
+            typeof conversationId !== "string" ||
+            !OBJECT_ID_PATTERN.test(conversationId)
+        ) {
+            throw new Error(
+                "Conversation ID was not returned correctly."
+            );
+        }
+
+        const initialMessageId =
+            response?.initialMessage?._id;
+
+        if (
+            typeof initialMessageId !== "string" ||
+            !OBJECT_ID_PATTERN.test(initialMessageId)
+        ) {
+            // Chat may already exist, so preserve access.
+            openConversation(conversationId);
+
+            toast.error(
+                "Chat created, but the initial message could not be verified."
+            );
+
             return;
         }
 
-        // ================== DOCUMENTS PENDING ==================
-        if (attachments.length > 0) {
-            toast.info(
-                "PDF and Word document sending will be available after upload integration."
+        // ================== START AI GENERATION ==================
+        openConversation(
+            conversationId,
+            initialMessageId
+        );
+    };
+
+    // ================== CREATE DOCUMENT CHAT ==================
+    const createDocumentChat = async (
+        files,
+        content,
+        clientRequestId
+    ) => {
+        // ================== UPLOAD CONTROLLER ==================
+        const controller = new AbortController();
+
+        uploadControllerRef.current = controller;
+        setUploadProgress(0);
+
+        let uploadedConversationId = null;
+
+        try {
+            // ================== UPLOAD AND INDEX DOCUMENTS ==================
+            const uploadResponse = await uploadDocuments(
+                files,
+                {
+                    signal: controller.signal,
+
+                    onUploadProgress: (progress) => {
+                        if (!controller.signal.aborted) {
+                            setUploadProgress(progress);
+                        }
+                    },
+                }
+            );
+
+            // ================== VERIFY CONVERSATION ==================
+            uploadedConversationId =
+                uploadResponse?.conversationId ||
+                uploadResponse?.conversation?._id;
+
+            if (
+                typeof uploadedConversationId !== "string" ||
+                !OBJECT_ID_PATTERN.test(uploadedConversationId)
+            ) {
+                throw new Error(
+                    "Uploaded conversation ID was not returned correctly."
+                );
+            }
+
+            // ================== VERIFY DOCUMENTS ==================
+            const documents = uploadResponse?.documents;
+
+            if (
+                !Array.isArray(documents) ||
+                documents.length !== files.length ||
+                documents.length > MAX_DOCUMENTS
+            ) {
+                throw new Error(
+                    "Uploaded document details are incomplete."
+                );
+            }
+
+            const documentIds = documents.map(
+                (document) => document._id
+            );
+
+            if (
+                documentIds.some(
+                    (id) =>
+                        typeof id !== "string" ||
+                        !OBJECT_ID_PATTERN.test(id)
+                ) ||
+                new Set(documentIds).size !== documentIds.length
+            ) {
+                throw new Error(
+                    "Uploaded document IDs are invalid."
+                );
+            }
+
+            if (controller.signal.aborted) {
+                throw new DOMException(
+                    "Upload cancelled.",
+                    "AbortError"
+                );
+            }
+
+            // ================== UPLOAD COMPLETED ==================
+            setUploadProgress(null);
+            uploadControllerRef.current = null;
+
+            // ================== SAVE USER MESSAGE ==================
+            const messageResponse = await sendMessage(
+                uploadedConversationId,
+                content,
+                clientRequestId,
+                documentIds
+            );
+
+            const savedMessageId =
+                messageResponse?.userMessage?._id;
+
+            if (
+                typeof savedMessageId !== "string" ||
+                !OBJECT_ID_PATTERN.test(savedMessageId)
+            ) {
+                throw new Error(
+                    "Saved document message was not returned correctly."
+                );
+            }
+
+            // ================== START AI GENERATION ==================
+            openConversation(
+                uploadedConversationId,
+                savedMessageId
+            );
+
+        } catch (error) {
+            // ================== PRESERVE UPLOADED DOCUMENTS ==================
+            if (uploadedConversationId) {
+                toast.error(
+                    "Documents were uploaded, but the chat message could not be completed. Open the conversation and try again."
+                );
+
+                openConversation(uploadedConversationId);
+                return;
+            }
+
+            throw error;
+
+        } finally {
+            if (uploadControllerRef.current === controller) {
+                uploadControllerRef.current = null;
+            }
+
+            setUploadProgress(null);
+        }
+    };
+
+    // ================== SEND MESSAGE ==================
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (sendingRef.current) return;
+
+        const content = message.trim();
+        const selectedFiles = [...attachments];
+
+        if (!content && !selectedFiles.length) {
+            return;
+        }
+
+        if (selectedFiles.length > MAX_DOCUMENTS) {
+            toast.error(
+                "Maximum 3 documents are allowed."
             );
             return;
         }
 
-        // ================== START REQUEST ==================
+        // ================== FILE-ONLY MESSAGE ==================
+        const finalContent = content ||
+            "Please summarize the attached document(s).";
+
         sendingRef.current = true;
         setSending(true);
 
         try {
-            // ================== REQUEST ID ==================
+            // ================== IDEMPOTENT REQUEST ID ==================
             if (!requestIdRef.current) {
                 requestIdRef.current =
                     generateChatRequestId();
             }
 
-            // ================== SAVE FIRST MESSAGE ==================
-            const response = await createConversation(
-                content,
-                requestIdRef.current
-            );
+            const clientRequestId =
+                requestIdRef.current;
 
-            const conversationId =
-                response.conversation?._id;
-
-            const initialMessageId =
-                response.initialMessage?._id;
-
-            // ================== VALIDATE CONVERSATION ==================
-            if (!conversationId) {
-                throw new Error(
-                    "Conversation ID was not returned."
+            // ================== DOCUMENT OR NORMAL CHAT ==================
+            if (selectedFiles.length) {
+                await createDocumentChat(
+                    selectedFiles,
+                    finalContent,
+                    clientRequestId
+                );
+            } else {
+                await createNormalChat(
+                    finalContent,
+                    clientRequestId
                 );
             }
-
-            // ================== HANDLE MISSING MESSAGE ID ==================
-            // The conversation may have been created successfully.
-            // Do not create another conversation by retrying automatically.
-            if (!initialMessageId) {
-                toast.info(
-                    "Conversation created. Open the chat to generate the AI response."
-                );
-
-                navigate(`/chat/${conversationId}`, {
-                    replace: true,
-                });
-
-                return;
-            }
-
-            // ================== OPEN CONVERSATION ==================
-            // Pass the saved message ID to Conversation.jsx.
-            // The existing user message must not be saved again.
-            navigate(`/chat/${conversationId}`, {
-                replace: true,
-                state: {
-                    autoGenerateMessageId: initialMessageId,
-                },
-            });
 
         } catch (error) {
-            // ================== ERROR NOTIFICATION ==================
-            toast.error(
-                error.response?.data?.message ||
-                error.message ||
-                "Unable to start conversation. Please try again."
-            );
+            const cancelled =
+                error?.name === "AbortError" ||
+                error?.name === "CanceledError" ||
+                error?.code === "ERR_CANCELED";
+
+            if (cancelled) {
+                toast.info(
+                    "Document upload cancelled."
+                );
+            } else {
+                toast.error(
+                    getErrorMessage(
+                        error,
+                        "Unable to start conversation. Please try again."
+                    )
+                );
+            }
+
         } finally {
-            // ================== RESET REQUEST STATE ==================
             sendingRef.current = false;
             setSending(false);
         }
     };
 
+    // ================== COMPONENT UI ==================
     return (
         <section
             className="chat-dashboard"
@@ -231,13 +447,38 @@ function ChatDashboard() {
                     value={message}
                     onChange={handleMessageChange}
                     attachments={attachments}
-                    onAttachmentsChange={
-                        handleAttachmentsChange
-                    }
+                    onAttachmentsChange={handleAttachmentsChange}
                     onSubmit={handleSubmit}
                     placeholder="Ask QueryNest AI anything..."
                     sending={sending}
                 />
+
+                {/* ================== UPLOAD PROGRESS ================== */}
+                {uploadProgress !== null && (
+                    <div
+                        className="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <span className="text-secondary small">
+                            {uploadProgress < 100
+                                ? `Uploading documents: ${uploadProgress}%`
+                                : "Processing documents and generating embeddings..."}
+                        </span>
+
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={handleCancelUpload}
+                        >
+                            <i
+                                className="fa-solid fa-xmark me-1"
+                                aria-hidden="true"
+                            />
+                            Cancel Upload
+                        </button>
+                    </div>
+                )}
 
                 {/* ================== FOOTNOTE ================== */}
                 <p className="chat-dashboard-note">
