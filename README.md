@@ -1,131 +1,323 @@
-# QueryNest AI
+# QueryNest AI — AI Chat & Document Assistant
 
-**Smart Conversations. Smarter Insights.**
+QueryNest AI is a full-stack AI assistant for everyday questions, coding help, writing assistance and document-based conversations.
 
-QueryNest AI is a full-stack MERN application for AI conversations and document assistance. It supports general questions, coding help, PDF and Word document analysis, resume reviews, and writing assistance.
+Users can upload PDF and Word documents, ask questions about their content, generate summaries and review resumes. Saved conversations make it possible to continue discussions with relevant document context.
 
-Built as a learning and portfolio project with authenticated chat access, document retrieval, and dual-provider AI routing.
+Built with MongoDB, Express, React and Node.js, QueryNest AI combines a responsive chat workspace with Groq and Google Gemini provider routing.
+
+**Live Website:** [querynest-ai-40r0.onrender.com](https://querynest-ai-40r0.onrender.com)
+
+## About the Project
+
+I built QueryNest AI to bring general AI conversations and document assistance into one workspace.
+
+Users can ask questions directly or upload documents for more specific assistance. The backend extracts document text, divides it into chunks and retrieves relevant content to support document-related answers and follow-up questions.
+
+AI requests are handled through a provider-routing layer with request limits, token budgets and fallback handling.
+
+The application is organized into three areas:
+
+- **Guest Dashboard:** Preview the chat interface and access signup or login.
+- **Chat Workspace:** Start conversations, upload documents and revisit saved chats.
+- **My Profile:** Manage personal details, update a profile picture, view usage and clear chat history.
+
+Chat, document uploads and account features require authentication.
 
 ## Features
 
-### AI Conversations
-- Stream AI responses in real time.
-- Ask general questions and get coding or writing assistance.
-- Regenerate responses and view response history.
-- Read formatted Markdown and syntax-highlighted code.
-- Access saved conversations from the sidebar.
+### Chat Workspace
 
-### Document Assistance
-- Upload PDF and Word (.docx) documents.
-- Generate summaries and ask document-related questions.
-- Review resumes and improve written content.
-- Retrieve relevant document sections for follow-up questions.
-- Enforce upload size and extracted-content limits.
-
-### Authentication
-- Register with a unique email address and phone number.
-- Sign in using email or phone and password.
-- Reset passwords through email OTP verification.
-- Maintain authenticated sessions using HttpOnly cookies.
-- Revoke sessions on logout and password reset.
-
-### Profile
-- Update your name and profile picture.
-- View registered email and phone number.
-- View AI usage and application limits.
-- Clear all chat history with confirmation.
-
-### Interface
-- Guest access to the chat dashboard.
-- Sign-in required for conversations, document uploads, and profile access.
+- General questions, coding help and writing assistance.
+- Streaming AI responses.
+- Saved conversations and sidebar history.
+- Response regeneration and response history.
+- Markdown formatting and syntax-highlighted code blocks.
+- Conversation titles displayed in the browser tab.
 - Responsive sidebar and mobile navigation.
 - Auto-expanding message composer.
-- Page-specific browser titles and metadata.
-- Conversation titles displayed in the browser tab.
 
-## Technology Stack
+### Document Assistance
 
-| Layer | Technologies |
+- PDF and Word (.docx) uploads.
+- Document summaries and content-based questions.
+- Resume review and writing improvement.
+- Text extraction, chunking and embedding generation.
+- Relevant document retrieval for follow-up questions.
+- File size, type and extracted-content limits.
+
+### Account and Profile
+
+- Signup, login and logout.
+- Login using email or phone number.
+- Email OTP-based password recovery.
+- Name and profile picture updates.
+- Read-only registered email and phone details.
+- AI usage and application limit information.
+- Clear all chat history with confirmation.
+- Guest dashboard access after logout.
+
+## Tech Stack
+
+| Area | Technologies |
 | --- | --- |
 | Frontend | React, Vite, React Router |
-| UI | Material UI, Bootstrap, custom CSS, Font Awesome |
-| API Client | Axios |
+| User Interface | Material UI, Bootstrap, CSS, Font Awesome |
+| API Requests | Axios |
+| Notifications | React Toastify |
 | Response Rendering | React Markdown, Remark GFM, React Syntax Highlighter |
 | Backend | Node.js, Express |
-| Database | MongoDB, Mongoose |
+| Database | MongoDB Atlas, Mongoose |
 | AI Providers | Groq, Google Gemini |
-| Authentication | JSON Web Tokens, HttpOnly cookies, bcrypt |
-| Validation | Joi |
+| Document Retrieval | Embeddings, MongoDB Atlas Vector Search |
 | Document Processing | PDF Parse, Mammoth |
-| Image Storage | Cloudinary |
-| Email Delivery | Brevo |
+| Authentication | JWT, HttpOnly cookies, bcrypt |
+| Validation | Joi |
+| File Handling | Multer, File Type |
+| Profile Image Storage | Cloudinary |
+| Email | Brevo |
+| Deployment | Render |
+| API Testing | Postman |
 
-## AI and Document Workflow
+## Application Workflow
 
-1. The user submits a message or uploads a document.
-2. The backend validates the request, ownership, and applicable limits.
-3. Uploaded documents are processed into text chunks and embeddings.
-4. Relevant document content is retrieved when needed.
-5. The AI service selects a provider based on the configured routing rules and availability.
-6. The response streams to the interface and is stored with the conversation.
+1. A user creates an account or signs in.
+2. The user starts a conversation and submits a message or document.
+3. The backend validates the request, ownership and usage limits.
+4. Uploaded documents are processed into searchable text chunks.
+5. Relevant document content is retrieved when the question requires it.
+6. The AI routing service selects a provider according to its configured rules and availability.
+7. The response streams to the interface and is saved in the conversation.
+8. The user can continue the discussion or revisit it from chat history.
 
-Provider availability and account quotas apply. Routing does not provide unlimited AI usage.
+General questions can be answered without uploading documents. Document follow-ups use relevant content from the associated conversation.
+
+Provider quotas still apply when using fallback routing.
+
+## Authentication and Validation
+
+Authentication uses signed JWTs stored in HttpOnly cookies, with active session records and session revocation.
+
+Backend controls include:
+
+- Password hashing with bcrypt.
+- Unique email and phone constraints.
+- Server-side request validation.
+- Authentication and conversation ownership checks.
+- Shared account login limits for email and phone identifiers.
+- Origin checks for state-changing API requests.
+- Restricted cross-origin access.
+- Upload validation and rate limiting before file parsing.
+- Chat request limits and AI token budgets.
+- Session invalidation after password reset.
+
+Password recovery uses a six-digit email OTP with a ten-minute validity, a sixty-second resend cooldown and limits on requests and incorrect verification attempts.
+
+HTTP request limiters use process memory. Multiple backend instances require a shared limiter store.
+
 
 ## Project Structure
 
-| Location | Purpose |
-| --- | --- |
-| `backend/config/` | Database, email, Cloudinary, AI configuration, and limits |
-| `backend/controllers/` | Request handling |
-| `backend/middleware/` | Authentication, ownership, validation, uploads, and rate limits |
-| `backend/models/` | Database schemas |
-| `backend/routes/` | API endpoints |
-| `backend/services/` | AI routing, document processing, retrieval, and email delivery |
-| `frontend/src/auth/` | Login, signup, and password recovery |
-| `frontend/src/components/chat/` | Sidebar, composer, and message components |
-| `frontend/src/components/common/` | Route protection and shared components |
-| `frontend/src/config/` | Application limits and page metadata |
-| `frontend/src/context/` | Authentication state |
-| `frontend/src/hooks/` | Reusable React hooks |
-| `frontend/src/layouts/` | Chat workspace layout |
-| `frontend/src/services/` | API communication and streaming |
-| `frontend/src/user/` | Dashboard, conversation, and profile pages |
-| `frontend/src/utils/` | Shared utility functions |
-| `frontend/public/images/` | Logo, favicon, and image assets |
+```text
+QueryNest_AI/
+├── backend/
+│   ├── config/
+│   │   ├── aiProviders.js
+│   │   ├── cloudinary.js
+│   │   ├── db.js
+│   │   ├── email.js
+│   │   └── usageLimits.js
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── chatController.js
+│   │   ├── documentController.js
+│   │   ├── passwordResetController.js
+│   │   ├── usageController.js
+│   │   └── userController.js
+│   ├── middleware/
+│   │   ├── authMiddleware.js
+│   │   ├── csrfMiddleware.js
+│   │   ├── errorMiddleware.js
+│   │   ├── ownershipMiddleware.js
+│   │   ├── rateLimiter.js
+│   │   ├── uploadMiddleware.js
+│   │   └── validateMiddleware.js
+│   ├── models/
+│   │   ├── AIUsage.js
+│   │   ├── AuthSession.js
+│   │   ├── Conversation.js
+│   │   ├── Document.js
+│   │   ├── DocumentChunk.js
+│   │   ├── Message.js
+│   │   ├── PasswordReset.js
+│   │   └── User.js
+│   ├── routes/
+│   │   ├── authRoutes.js
+│   │   ├── chatRoutes.js
+│   │   ├── documentRoutes.js
+│   │   ├── usageRoutes.js
+│   │   └── userRoutes.js
+│   ├── services/
+│   │   ├── ai/
+│   │   │   ├── aiRouter.js
+│   │   │   ├── contextBuilder.js
+│   │   │   ├── geminiProvider.js
+│   │   │   ├── groqProvider.js
+│   │   │   ├── promptTemplates.js
+│   │   │   └── taskRouter.js
+│   │   ├── documents/
+│   │   │   ├── chunkService.js
+│   │   │   ├── docxExtractor.js
+│   │   │   └── pdfExtractor.js
+│   │   ├── retrieval/
+│   │   │   ├── embeddingService.js
+│   │   │   └── retrievalService.js
+│   │   ├── usage/
+│   │   │   ├── requestScheduler.js
+│   │   │   ├── tokenBudget.js
+│   │   │   └── usageService.js
+│   │   ├── deletionService.js
+│   │   └── emailService.js
+│   ├── utils/
+│   │   ├── ExpressError.js
+│   │   ├── generateToken.js
+│   │   └── streamResponse.js
+│   ├── validations/
+│   │   └── schema.js
+│   ├── app.js
+│   ├── server.js
+│   ├── package.json
+│   └── package-lock.json
+│
+├── frontend/
+│   ├── public/
+│   │   └── images/
+│   │       ├── default-avatar.svg
+│   │       ├── QueryNest_AI_Favicon.png
+│   │       └── QueryNest_AI_Logo.png
+│   ├── src/
+│   │   ├── auth/
+│   │   │   ├── ForgotPassword.jsx
+│   │   │   ├── Login.jsx
+│   │   │   └── Signup.jsx
+│   │   ├── components/
+│   │   │   ├── chat/
+│   │   │   │   ├── ChatHistory.jsx
+│   │   │   │   ├── ChatSidebar.jsx
+│   │   │   │   ├── CodeBlock.jsx
+│   │   │   │   ├── MessageComposer.jsx
+│   │   │   │   └── MessageList.jsx
+│   │   │   └── common/
+│   │   │       ├── NotFound.jsx
+│   │   │       └── ProtectedRoute.jsx
+│   │   ├── config/
+│   │   │   ├── appConfig.js
+│   │   │   └── seoConfig.js
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── css/
+│   │   │   ├── auth.css
+│   │   │   ├── global.css
+│   │   │   └── panel.css
+│   │   ├── hooks/
+│   │   │   └── usePageSEO.js
+│   │   ├── layouts/
+│   │   │   ├── AuthLayout.jsx
+│   │   │   └── ChatLayout.jsx
+│   │   ├── services/
+│   │   │   ├── api.js
+│   │   │   ├── chatService.js
+│   │   │   └── documentService.js
+│   │   ├── user/
+│   │   │   ├── ChatDashboard.jsx
+│   │   │   ├── Conversation.jsx
+│   │   │   └── Profile.jsx
+│   │   ├── utils/
+│   │   │   ├── formatDate.js
+│   │   │   └── groupConversations.js
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
+│
+├── .gitignore
+├── backend_packages.txt
+├── frontend_package.txt
+└── README.md
+```
+
+Local `.env` files, `node_modules` directories and generated `dist` files are excluded from this structure.
 
 ## Local Setup
 
 ### Prerequisites
 
 - Node.js 24 and npm.
-- MongoDB with transaction support, such as MongoDB Atlas or a local replica set.
-- A configured Atlas vector-search index for document retrieval.
-- Groq and Gemini API credentials.
-- Brevo credentials and a verified sender.
-- Cloudinary credentials.
-- Nodemon available for the backend development script.
+- MongoDB Atlas database with transaction support.
+- Atlas vector-search index matching the retrieval service configuration.
+- Groq and Google Gemini API credentials.
+- Cloudinary account.
+- Brevo account with a verified sender.
+- Nodemon for the backend development script.
 
-### 1. Configure Environment Variables
+### 1. Get the Project
 
-Create `backend/.env` with the following configuration:
+Clone this repository using its GitHub URL, or download and extract the source.
 
-| Variable | Purpose |
-| --- | --- |
-| `PORT` | Backend port, such as `8080` |
-| `DB_URI` | MongoDB connection string |
-| `JWT_SECRET` | Strong random secret of at least 32 bytes |
-| `CLIENT_ORIGIN` | Frontend origin, such as `http://localhost:5173` |
-| `GROQ_API_KEY` | Groq API key |
-| `GEMINI_API_KEY` | Gemini API key |
-| `BREVO_API_KEY` | Brevo API key |
-| `BREVO_SENDER_EMAIL` | Verified sender email |
-| `BREVO_SENDER_NAME` | Email sender display name |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
-| `NODE_ENV` | `development` for local development |
-| `TRUST_PROXY_HOPS` | `0` locally; configure for the actual deployment proxy |
-| `SERVE_FRONTEND` | `false` when running Vite separately |
+Open a terminal in the project folder:
+
+```bash
+cd QueryNest_AI
+```
+
+### 2. Install Dependencies
+
+```bash
+npm ci --prefix backend
+npm ci --prefix frontend
+```
+
+If nodemon is not installed:
+
+```bash
+npm install -g nodemon
+```
+
+### 3. Configure Environment Variables
+
+Create `backend/.env`:
+
+```env
+NODE_ENV=development
+PORT=8080
+CLIENT_ORIGIN=http://localhost:5173
+
+DB_URI=your_mongodb_connection_string
+JWT_SECRET=your_generated_secret
+
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
+
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+BREVO_API_KEY=your_brevo_api_key
+BREVO_SENDER_EMAIL=your_verified_sender_email
+BREVO_SENDER_NAME=QueryNest AI
+
+TRUST_PROXY_HOPS=0
+SERVE_FRONTEND=false
+```
+
+Generate a JWT secret:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(64).toString('hex'))"
+```
 
 Create `frontend/.env`:
 
@@ -133,102 +325,79 @@ Create `frontend/.env`:
 VITE_API_URL=http://localhost:8080/api
 ```
 
-Use the same hostname consistently for the frontend and backend. Keep API keys and other secrets in the backend environment only.
+Replace the placeholders with your own credentials. Keep `.env` files out of version control and allow your backend's connection IP in MongoDB Atlas.
 
-### 2. Install Dependencies
+Configure the vector-search index to match the index name, embedding dimensions and fields expected by the retrieval service.
 
-Backend:
-
-```bash
-cd backend
-npm ci
-```
-
-Frontend, from a separate terminal at the project root:
+### 4. Start the Backend
 
 ```bash
-cd frontend
-npm ci
+npm run dev --prefix backend
 ```
 
-`npm ci` installs the dependency versions recorded in each lockfile. Use `npm install` when intentionally adding or updating dependencies.
+### 5. Start the Frontend
 
-If nodemon is not already installed:
+Run this command in a separate terminal:
 
 ```bash
-npm install -g nodemon
+npm run dev --prefix frontend
 ```
 
-### 3. Start Development Servers
+Open the URL shown by Vite. It should match the backend's `CLIENT_ORIGIN` setting.
 
-Backend:
+The backend health endpoint is available at:
+
+```text
+http://localhost:8080/api/health
+```
+
+The dashboard is accessible to guests. Sign in to use conversations, document uploads and profile features.
+
+## Deployment
+
+The application is deployed on Render. The frontend and backend use a single Web Service, with Express serving the frontend production build and API under the same domain.
+
+- **MongoDB Atlas** stores application data and document retrieval records.
+- **Cloudinary** stores profile images.
+- **Brevo** sends password recovery emails.
+- **Groq and Google Gemini** handle AI requests.
+- **Render environment variables** store deployment configuration and credentials.
+
+### Build Command
 
 ```bash
-cd backend
-npm run dev
+npm ci --prefix backend && npm ci --prefix frontend --include=dev && npm run build --prefix frontend
 ```
 
-Frontend:
+### Start Command
 
 ```bash
-cd frontend
-npm run dev
+npm start --prefix backend
 ```
 
-Open the local URL shown by Vite in the terminal.
+### Production Settings
 
-## Available Scripts
+Alongside the database and service credentials, configure:
 
-| Folder | Command | Purpose |
-| --- | --- | --- |
-| `backend` | `npm run dev` | Start the backend with nodemon |
-| `backend` | `npm start` | Start the backend with Node.js |
-| `frontend` | `npm run dev` | Start the Vite development server |
-| `frontend` | `npm run lint` | Run ESLint |
-| `frontend` | `npm run build` | Generate a production frontend build |
-| `frontend` | `npm run preview` | Preview the generated frontend build locally |
+```env
+NODE_ENV=production
+VITE_API_URL=/api
+SERVE_FRONTEND=true
+CLIENT_ORIGIN=https://querynest-ai-40r0.onrender.com
+```
 
-## Page Metadata
+Set `NODE_VERSION` to the Node.js version used to validate the application.
 
-Page metadata is managed through:
+Render provides the server port through `PORT`; a manually configured port is not required.
 
-- `frontend/src/config/seoConfig.js`
-- `frontend/src/hooks/usePageSEO.js`
+Set `TRUST_PROXY_HOPS` according to the actual hosting and proxy configuration. Verify it before relying on client-IP-based rate limiting.
 
-Each page applies its own title, description, keywords, and robots directive. The initial fallback is defined in `frontend/index.html`.
+Use your own service URL for `CLIENT_ORIGIN` when deploying another instance.
 
-Account, authentication, conversation, and error pages use `noindex`. Conversation pages display the selected chat title in the browser tab.
-
-Metadata controls are separate from authentication and access permissions.
-
-## Security
-
-- Password hashing with bcrypt.
-- JWT authentication using HttpOnly cookies.
-- Active session checks and session revocation.
-- Email OTP expiry, resend cooldown, and verification attempt limits.
-- Shared account login limits for email and phone identifiers.
-- Origin validation and restricted CORS.
-- Conversation and document ownership checks.
-- Request validation with Joi.
-- File size, extension, and content checks.
-- Upload rate limits applied before file parsing.
-- Separate chat request limits and AI usage budgets.
-- Backend-only storage of provider credentials.
-
-HTTP rate limiters use process memory. A multi-instance deployment requires a shared limiter store.
-
-## Scope and Limitations
-
-- Guest users can explore the dashboard; chat and document features require sign-in.
-- Document support is limited to PDF and DOCX files.
-- Edited Word document generation and export are not included.
-- AI responses may contain inaccuracies and should be reviewed.
-- Free-provider quotas and service availability can affect requests.
-- Live service testing and deployment verification are separate from local code checks.
+The production frontend build completed successfully. Full live end-to-end testing is pending.
 
 ## Author
 
 **Krushna Chandra Mohanty**
 
-Developed for full-stack learning, portfolio demonstration, and interview discussions.
+[GitHub](https://github.com/krushna706)
