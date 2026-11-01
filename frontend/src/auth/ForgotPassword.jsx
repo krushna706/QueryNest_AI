@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, CircularProgress, IconButton, InputAdornment, TextField } from "@mui/material";
@@ -74,6 +78,8 @@ function PasswordVisibility({ visible, onToggle, label, disabled }) {
 
 // Forgot password page
 function ForgotPassword() {
+    usePageSEO(seoPages.forgotPassword);
+
     const navigate = useNavigate();
     const submitLock = useRef(false);
 

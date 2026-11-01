@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -143,6 +147,8 @@ function SectionHeading({ id, title, description, icon, danger = false }) {
 
 // My profile
 function Profile() {
+    usePageSEO(seoPages.profile);
+
     const { user, updateUserProfile, refreshUser } = useAuth();
     const [name, setName] = useState(user?.name || "");
     const [savingName, setSavingName] = useState(false);

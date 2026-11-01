@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { DOCUMENT_LIMITS } from "../config/appConfig";
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -221,6 +225,12 @@ function Conversation() {
     const navigate = useNavigate();
 
     const [conversation, setConversation] = useState(null);
+    
+    usePageSEO({
+    ...seoPages.conversation,
+    title: conversation?.title || seoPages.conversation.title,
+    });
+
     const [messages, setMessages] = useState([]);
 
     const [message, setMessage] = useState("");

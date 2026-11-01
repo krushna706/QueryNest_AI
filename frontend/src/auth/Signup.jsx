@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TextField, InputAdornment, IconButton, Button } from "@mui/material";
@@ -38,6 +42,8 @@ function getSignupErrorMessage(error) {
 
 // Signup page
 function Signup() {
+    usePageSEO(seoPages.signup);
+
     const navigate = useNavigate();
     const { signup, loading } = useAuth();
 

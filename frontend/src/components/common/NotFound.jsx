@@ -1,6 +1,12 @@
+
+import usePageSEO from "../../hooks/usePageSEO";
+import { seoPages } from "../../config/seoConfig";
+
 import { Link } from "react-router-dom";
 
 function NotFound() {
+    usePageSEO(seoPages.notFound);
+    
     return (
         <main className="not-found-page">
             <section className="not-found-card" aria-labelledby="not-found-title">

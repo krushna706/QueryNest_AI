@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { DOCUMENT_LIMITS } from "../config/appConfig";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -49,6 +53,8 @@ function getErrorMessage(error, fallback) {
 
 // Chat dashboard
 function ChatDashboard() {
+    usePageSEO(seoPages.chatDashboard);
+    
     const navigate = useNavigate();
     const { user } = useAuth();
     const { requireAuth } = useOutletContext() || {};

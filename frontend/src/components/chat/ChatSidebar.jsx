@@ -95,7 +95,7 @@ function SidebarContent({
             await logout();
 
             onClose?.();
-            navigate("/login", { replace: true });
+            navigate("/chat", { replace: true });
 
             toast.success("Logged out successfully.");
         } catch (error) {

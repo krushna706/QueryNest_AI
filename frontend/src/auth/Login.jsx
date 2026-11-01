@@ -1,3 +1,7 @@
+
+import usePageSEO from "../hooks/usePageSEO";
+import { seoPages } from "../config/seoConfig";
+
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { TextField, InputAdornment, IconButton, Button } from "@mui/material";
@@ -38,6 +42,8 @@ function getLoginErrorMessage(error) {
 
 // Login page
 function Login() {
+    usePageSEO(seoPages.login);
+    
     const { login, loading } = useAuth();
 
     const [showPassword, setShowPassword] = useState(false);
