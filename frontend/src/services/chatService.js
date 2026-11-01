@@ -1,11 +1,12 @@
+import { DOCUMENT_LIMITS } from "../config/appConfig";
 import api from "./api";
 
-// ================== REQUEST ID ==================
+// Request id
 function generateChatRequestId() {
     return crypto.randomUUID();
 }
 
-// ================== CREATE CONVERSATION ==================
+// Create conversation
 async function createConversation(content, clientRequestId) {
     const { data } = await api.post("/chats", {
         content,
@@ -15,12 +16,8 @@ async function createConversation(content, clientRequestId) {
     return data;
 }
 
-// ================== CHAT HISTORY ==================
-async function getChatHistory({
-    search = "",
-    cursor,
-    limit = 20,
-} = {}) {
+// Chat history
+async function getChatHistory({ search = "", cursor, limit = 20 } = {}) {
     const { data } = await api.get("/chats", {
         params: {
             search,
@@ -32,114 +29,77 @@ async function getChatHistory({
     return data;
 }
 
-// ================== GET CONVERSATION ==================
+// Get conversation
 async function getConversation(conversationId) {
-    const { data } = await api.get(
-        `/chats/${conversationId}`
-    );
+    const { data } = await api.get(`/chats/${conversationId}`);
 
     return data;
 }
 
-// ================== RENAME CONVERSATION ==================
+// Rename conversation
 async function renameConversation(conversationId, title) {
-    const { data } = await api.patch(
-        `/chats/${conversationId}`,
-        { title }
-    );
+    const { data } = await api.patch(`/chats/${conversationId}`, { title });
 
     return data;
 }
 
-// ================== DELETE CONVERSATION ==================
+// Delete conversation
 async function deleteConversation(conversationId) {
-    const { data } = await api.delete(
-        `/chats/${conversationId}`
-    );
+    const { data } = await api.delete(`/chats/${conversationId}`);
 
     return data;
 }
 
-// ================== SEND USER MESSAGE ==================
-async function sendMessage(
-    conversationId,
-    content,
-    clientRequestId,
-    attachmentIds = []
-) {
+// Send user message
+async function sendMessage(conversationId, content, clientRequestId, attachmentIds = []) {
     if (!Array.isArray(attachmentIds)) {
         throw new Error("Attachments must be an array.");
     }
 
-    if (attachmentIds.length > 3) {
-        throw new Error(
-            "Maximum 3 documents are allowed."
-        );
+    if (attachmentIds.length > DOCUMENT_LIMITS.maxFiles) {
+        throw new Error("Maximum 3 documents are allowed.");
     }
 
     const uniqueIds = new Set(attachmentIds);
 
     if (
         uniqueIds.size !== attachmentIds.length ||
-        attachmentIds.some(
-            (id) =>
-                typeof id !== "string" ||
-                !/^[a-f0-9]{24}$/i.test(id)
-        )
+        attachmentIds.some((id) => typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id))
     ) {
-        throw new Error(
-            "Invalid or duplicate document IDs."
-        );
+        throw new Error("Invalid or duplicate document IDs.");
     }
 
-    const { data } = await api.post(
-        `/chats/${conversationId}/messages`,
-        {
-            content,
-            clientRequestId,
-            ...(attachmentIds.length
-                ? { attachmentIds }
-                : {}),
-        }
-    );
+    const { data } = await api.post(`/chats/${conversationId}/messages`, {
+        content,
+        clientRequestId,
+        ...(attachmentIds.length ? { attachmentIds } : {}),
+    });
 
     return data;
 }
 
-// ================== MESSAGE HISTORY ==================
-async function getMessageHistory(
-    conversationId,
-    {
-        before,
-        limit = 20,
-    } = {}
-) {
-    const { data } = await api.get(
-        `/chats/${conversationId}/messages`,
-        {
-            params: {
-                limit,
-                ...(before ? { before } : {}),
-            },
-        }
-    );
+// Message history
+async function getMessageHistory(conversationId, { before, limit = 20 } = {}) {
+    const { data } = await api.get(`/chats/${conversationId}/messages`, {
+        params: {
+            limit,
+            ...(before ? { before } : {}),
+        },
+    });
 
     return data;
 }
 
-// ================== VALIDATE OBJECT ID ==================
+// Validate object id
 function validateMessageId(value, fieldName) {
-    if (
-        typeof value !== "string" ||
-        !/^[a-f0-9]{24}$/i.test(value)
-    ) {
+    if (typeof value !== "string" || !/^[a-f0-9]{24}$/i.test(value)) {
         throw new Error(`Invalid ${fieldName}.`);
     }
 
     return value;
 }
 
-// ================== PARSE RETRY WAIT ==================
+// Parse retry wait
 function parseRetryAfter(value) {
     if (value == null || value === "") {
         return null;
@@ -147,10 +107,7 @@ function parseRetryAfter(value) {
 
     const seconds = Number(value);
 
-    if (
-        Number.isFinite(seconds) &&
-        seconds > 0
-    ) {
+    if (Number.isFinite(seconds) && seconds > 0) {
         return Math.ceil(seconds);
     }
 
@@ -159,86 +116,46 @@ function parseRetryAfter(value) {
         const timestamp = Date.parse(value);
 
         if (Number.isFinite(timestamp)) {
-            const remaining = Math.ceil(
-                (timestamp - Date.now()) / 1000
-            );
+            const remaining = Math.ceil((timestamp - Date.now()) / 1000);
 
-            return remaining > 0
-                ? remaining
-                : null;
+            return remaining > 0 ? remaining : null;
         }
     }
 
     return null;
 }
 
-// ================== CREATE STRUCTURED AI ERROR ==================
+// Create structured ai error
 function createAIError(
     payload,
-    {
-        fallback = "AI generation failed. Please try again.",
-        httpStatus = null,
-        retryAfter = null,
-    } = {}
+    { fallback = "AI generation failed. Please try again.", httpStatus = null, retryAfter = null } = {}
 ) {
-    const details =
-        payload &&
-        typeof payload === "object"
-            ? payload
-            : {};
+    const details = payload && typeof payload === "object" ? payload : {};
 
-    const nestedError =
-        details.error &&
-        typeof details.error === "object"
-            ? details.error
-            : {};
+    const nestedError = details.error && typeof details.error === "object" ? details.error : {};
 
     const serverMessage =
-        nestedError.message ||
-        details.message ||
-        (
-            typeof details.error === "string"
-                ? details.error
-                : null
-        );
+        nestedError.message || details.message || (typeof details.error === "string" ? details.error : null);
 
-    const message =
-        typeof serverMessage === "string" &&
-        serverMessage.trim()
-            ? serverMessage.trim()
-            : fallback;
+    const message = typeof serverMessage === "string" && serverMessage.trim() ? serverMessage.trim() : fallback;
 
-    const providedCode =
-        nestedError.code ||
-        details.code ||
-        null;
+    const providedCode = nestedError.code || details.code || null;
 
-    const code =
-        typeof providedCode === "string" &&
-        providedCode.trim()
-            ? providedCode.trim().toUpperCase()
-            : null;
+    const code = typeof providedCode === "string" && providedCode.trim() ? providedCode.trim().toUpperCase() : null;
 
-    const providedStatus =
-        nestedError.status ??
-        details.status ??
-        httpStatus;
+    const providedStatus = nestedError.status ?? details.status ?? httpStatus;
 
     const numericStatus = Number(providedStatus);
 
     const status =
-        Number.isInteger(numericStatus) &&
-        numericStatus >= 400 &&
-        numericStatus <= 599
-            ? numericStatus
-            : null;
+        Number.isInteger(numericStatus) && numericStatus >= 400 && numericStatus <= 599 ? numericStatus : null;
 
     const retryAfterSeconds = parseRetryAfter(
         nestedError.retryAfterSeconds ??
-        details.retryAfterSeconds ??
-        nestedError.retryAfter ??
-        details.retryAfter ??
-        retryAfter
+            details.retryAfterSeconds ??
+            nestedError.retryAfter ??
+            details.retryAfter ??
+            retryAfter
     );
 
     const error = new Error(message);
@@ -258,42 +175,34 @@ function createAIError(
             message,
             ...(code ? { code } : {}),
 
-            ...(retryAfterSeconds
-                ? { retryAfterSeconds }
-                : {}),
+            ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
         },
 
         headers: retryAfterSeconds
             ? {
-                "retry-after":
-                    String(retryAfterSeconds),
-            }
+                  "retry-after": String(retryAfterSeconds),
+              }
             : {},
     };
 
     return error;
 }
 
-// ================== PROCESS SSE EVENT ==================
+// Process sse event
 function processStreamEvent(block, onEvent) {
     let eventType = "message";
 
     const dataLines = [];
 
     for (const line of block.split(/\r?\n/)) {
-        if (
-            !line ||
-            line.startsWith(":")
-        ) {
+        if (!line || line.startsWith(":")) {
             continue;
         }
 
         if (line.startsWith("event:")) {
             eventType = line.slice(6).trim();
         } else if (line.startsWith("data:")) {
-            dataLines.push(
-                line.slice(5).trimStart()
-            );
+            dataLines.push(line.slice(5).trimStart());
         }
     }
 
@@ -304,25 +213,21 @@ function processStreamEvent(block, onEvent) {
     let data;
 
     try {
-        data = JSON.parse(
-            dataLines.join("\n")
-        );
+        data = JSON.parse(dataLines.join("\n"));
     } catch {
         throw createAIError(
             {
                 code: "INVALID_STREAM_RESPONSE",
             },
             {
-                fallback:
-                    "The AI response was interrupted. Please try again.",
+                fallback: "The AI response was interrupted. Please try again.",
             }
         );
     }
 
     if (eventType === "error") {
         throw createAIError(data, {
-            fallback:
-                "AI generation failed. Please try again.",
+            fallback: "AI generation failed. Please try again.",
         });
     }
 
@@ -334,71 +239,45 @@ function processStreamEvent(block, onEvent) {
     return eventType === "done";
 }
 
-// ================== GENERATE AI STREAM ==================
-async function generateAIResponse(
-    conversationId,
-    messageId,
-    {
-        regenerate = false,
-        signal,
-        onEvent,
-    } = {}
-) {
-    const validConversationId = validateMessageId(
-        conversationId,
-        "Conversation ID"
-    );
+// Generate ai stream
+async function generateAIResponse(conversationId, messageId, { regenerate = false, signal, onEvent } = {}) {
+    const validConversationId = validateMessageId(conversationId, "Conversation ID");
 
-    const validMessageId = validateMessageId(
-        messageId,
-        "Message ID"
-    );
+    const validMessageId = validateMessageId(messageId, "Message ID");
 
-    const baseURL =
-        api.defaults.baseURL?.replace(/\/$/, "");
+    const baseURL = api.defaults.baseURL?.replace(/\/$/, "");
 
     if (!baseURL) {
-        throw new Error(
-            "API base URL is not configured."
-        );
+        throw new Error("API base URL is not configured.");
     }
 
-    const response = await fetch(
-        `${baseURL}/chats/${validConversationId}/generate`,
-        {
-            method: "POST",
+    const response = await fetch(`${baseURL}/chats/${validConversationId}/generate`, {
+        method: "POST",
 
-            credentials: "include",
+        credentials: "include",
 
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "text/event-stream",
-            },
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+        },
 
-            body: JSON.stringify({
-                messageId: validMessageId,
-                regenerate: Boolean(regenerate),
-            }),
+        body: JSON.stringify({
+            messageId: validMessageId,
+            regenerate: Boolean(regenerate),
+        }),
 
-            signal,
-        }
-    );
+        signal,
+    });
 
     if (!response.ok) {
-        const errorData = await response
-            .json()
-            .catch(() => null);
+        const errorData = await response.json().catch(() => null);
 
         throw createAIError(errorData, {
             httpStatus: response.status,
 
-            retryAfter:
-                response.headers.get(
-                    "Retry-After"
-                ),
+            retryAfter: response.headers.get("Retry-After"),
 
-            fallback:
-                `AI request failed (${response.status}).`,
+            fallback: `AI request failed (${response.status}).`,
         });
     }
 
@@ -408,27 +287,21 @@ async function generateAIResponse(
                 code: "STREAM_UNAVAILABLE",
             },
             {
-                fallback:
-                    "The AI response could not be started. Please try again.",
+                fallback: "The AI response could not be started. Please try again.",
             }
         );
     }
 
-    const reader =
-        response.body.getReader();
+    const reader = response.body.getReader();
 
-    const decoder =
-        new TextDecoder();
+    const decoder = new TextDecoder();
 
     let buffer = "";
     let completed = false;
 
     try {
         while (!completed) {
-            const {
-                done,
-                value,
-            } = await reader.read();
+            const { done, value } = await reader.read();
 
             if (done) {
                 break;
@@ -441,42 +314,25 @@ async function generateAIResponse(
             let boundary = /\r?\n\r?\n/.exec(buffer);
 
             while (boundary) {
-                const block = buffer.slice(
-                    0,
-                    boundary.index
-                );
+                const block = buffer.slice(0, boundary.index);
 
-                buffer = buffer.slice(
-                    boundary.index +
-                    boundary[0].length
-                );
+                buffer = buffer.slice(boundary.index + boundary[0].length);
 
-                if (
-                    processStreamEvent(
-                        block,
-                        onEvent
-                    )
-                ) {
+                if (processStreamEvent(block, onEvent)) {
                     completed = true;
                     break;
                 }
 
-                boundary =
-                    /\r?\n\r?\n/.exec(buffer);
+                boundary = /\r?\n\r?\n/.exec(buffer);
             }
 
-            if (
-                buffer.length >
-                1024 * 1024
-            ) {
+            if (buffer.length > 1024 * 1024) {
                 throw createAIError(
                     {
-                        code:
-                            "STREAM_EVENT_TOO_LARGE",
+                        code: "STREAM_EVENT_TOO_LARGE",
                     },
                     {
-                        fallback:
-                            "The AI response was interrupted. Please try again.",
+                        fallback: "The AI response was interrupted. Please try again.",
                     }
                 );
             }
@@ -486,37 +342,30 @@ async function generateAIResponse(
             buffer += decoder.decode();
 
             if (buffer.trim()) {
-                completed = processStreamEvent(
-                    buffer.trim(),
-                    onEvent
-                );
+                completed = processStreamEvent(buffer.trim(), onEvent);
             }
         }
 
         if (!completed) {
             throw createAIError(
                 {
-                    code:
-                        "STREAM_INTERRUPTED",
+                    code: "STREAM_INTERRUPTED",
                 },
                 {
-                    fallback:
-                        "The AI response was interrupted. Please try again.",
+                    fallback: "The AI response was interrupted. Please try again.",
                 }
             );
         }
     } finally {
         if (!completed) {
-            await reader
-                .cancel()
-                .catch(() => {});
+            await reader.cancel().catch(() => {});
         }
 
         reader.releaseLock();
     }
 }
 
-// ================== EXPORTS ==================
+// Exports
 export {
     generateChatRequestId,
     createConversation,

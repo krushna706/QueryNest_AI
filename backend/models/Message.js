@@ -1,19 +1,11 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== MESSAGE STATUSES ==================
-const MESSAGE_STATUSES = [
-    "queued",
-    "streaming",
-    "completed",
-    "stopped",
-    "incomplete",
-    "failed",
-];
+// Message statuses
+const MESSAGE_STATUSES = ["queued", "streaming", "completed", "stopped", "incomplete", "failed"];
 
-// ================== MESSAGE SOURCES ==================
+// Message sources
 const sourceSchema = new Schema(
     {
         documentId: {
@@ -42,7 +34,7 @@ const sourceSchema = new Schema(
             maxlength: 255,
         },
 
-        // ================== FILE TYPE ==================
+        // File type
         fileType: {
             type: String,
             enum: ["pdf", "docx"],
@@ -57,7 +49,7 @@ const sourceSchema = new Schema(
             default: null,
         },
 
-        // ================== PDF PAGE REFERENCE ==================
+        // Pdf page reference
         pageNumber: {
             type: Number,
             min: 1,
@@ -73,7 +65,7 @@ const sourceSchema = new Schema(
             },
         },
 
-        // ================== DOCX SECTION REFERENCE ==================
+        // Docx section reference
         sectionTitle: {
             type: String,
             trim: true,
@@ -105,14 +97,14 @@ const sourceSchema = new Schema(
             },
         },
 
-        // ================== SOURCE EXCERPT ==================
+        // Source excerpt
         text: {
             type: String,
             default: "",
             maxlength: 8000,
         },
 
-        // ================== RETRIEVAL SCORE ==================
+        // Retrieval score
         score: {
             type: Number,
             min: 0,
@@ -125,57 +117,29 @@ const sourceSchema = new Schema(
     }
 );
 
-// ================== SOURCE VALIDATION ==================
+// Source validation
 sourceSchema.pre("validate", function () {
-    if (
-        this.fileType === "docx" &&
-        this.pageNumber != null
-    ) {
-        this.invalidate(
-            "pageNumber",
-            "DOCX citations cannot use PDF page numbers."
-        );
+    if (this.fileType === "docx" && this.pageNumber != null) {
+        this.invalidate("pageNumber", "DOCX citations cannot use PDF page numbers.");
     }
 
-    if (
-        (this.paragraphStart == null) !==
-        (this.paragraphEnd == null)
-    ) {
-        this.invalidate(
-            "paragraphEnd",
-            "Both paragraph boundaries are required together."
-        );
+    if ((this.paragraphStart == null) !== (this.paragraphEnd == null)) {
+        this.invalidate("paragraphEnd", "Both paragraph boundaries are required together.");
     }
 
-    if (
-        this.paragraphStart != null &&
-        this.paragraphEnd != null &&
-        this.paragraphEnd < this.paragraphStart
-    ) {
-        this.invalidate(
-            "paragraphEnd",
-            "Paragraph end cannot precede paragraph start."
-        );
+    if (this.paragraphStart != null && this.paragraphEnd != null && this.paragraphEnd < this.paragraphStart) {
+        this.invalidate("paragraphEnd", "Paragraph end cannot precede paragraph start.");
     }
 
-    if (
-        this.fileType === "pdf" &&
-        (
-            this.paragraphStart != null ||
-            this.paragraphEnd != null
-        )
-    ) {
-        this.invalidate(
-            "paragraphStart",
-            "PDF citations must use page references."
-        );
+    if (this.fileType === "pdf" && (this.paragraphStart != null || this.paragraphEnd != null)) {
+        this.invalidate("paragraphStart", "PDF citations must use page references.");
     }
 });
 
-// ================== MESSAGE SCHEMA ==================
+// Message schema
 const messageSchema = new Schema(
     {
-        // ================== MESSAGE OWNER ==================
+        // Message owner
         userId: {
             type: Schema.Types.ObjectId,
             ref: "User",
@@ -190,7 +154,7 @@ const messageSchema = new Schema(
             immutable: true,
         },
 
-        // ================== MESSAGE DETAILS ==================
+        // Message details
         role: {
             type: String,
             enum: ["user", "assistant"],
@@ -211,7 +175,7 @@ const messageSchema = new Schema(
             required: true,
         },
 
-        // ================== RESPONSE ATTEMPTS ==================
+        // Response attempts
         replyToMessageId: {
             type: Schema.Types.ObjectId,
             ref: "Message",
@@ -231,7 +195,7 @@ const messageSchema = new Schema(
             default: null,
         },
 
-        // ================== AI PROVIDER ==================
+        // Ai provider
         provider: {
             type: String,
             enum: ["groq", "gemini", null],
@@ -245,7 +209,7 @@ const messageSchema = new Schema(
             default: null,
         },
 
-        // ================== DOCUMENT ATTACHMENTS ==================
+        // Document attachments
         attachmentIds: {
             type: [
                 {
@@ -256,7 +220,7 @@ const messageSchema = new Schema(
             default: [],
         },
 
-        // ================== DOCUMENT CITATIONS ==================
+        // Document citations
         sources: {
             type: [sourceSchema],
             default: [],
@@ -267,7 +231,7 @@ const messageSchema = new Schema(
     }
 );
 
-// ================== DATABASE INDEXES ==================
+// Database indexes
 messageSchema.index({
     userId: 1,
     conversationId: 1,
@@ -297,11 +261,8 @@ messageSchema.index(
     }
 );
 
-// ================== MODEL ==================
-const Message = mongoose.model(
-    "Message",
-    messageSchema
-);
+// Model
+const Message = mongoose.model("Message", messageSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = Message;

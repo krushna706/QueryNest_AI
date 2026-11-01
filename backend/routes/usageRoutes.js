@@ -5,10 +5,10 @@ const usageController = require("../controllers/usageController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { usageReadLimiter } = require("../middleware/rateLimiter");
 
-// ================== ROUTER SETUP ==================
+// Router setup
 const router = express.Router();
 
-// ================== AUTHENTICATION ==================
+// Authentication
 router.use(authMiddleware);
 
 // GET /api/usage/me

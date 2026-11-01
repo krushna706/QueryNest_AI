@@ -1,7 +1,6 @@
-
 const ExpressError = require("../utils/ExpressError");
 
-// ================== CENTRAL ERROR HANDLER ==================
+// Central error handler
 function errorMiddleware(error, req, res, next) {
     if (res.headersSent) {
         return next(error);
@@ -10,7 +9,6 @@ function errorMiddleware(error, req, res, next) {
     let statusCode = 500;
     let message = "Something went wrong. Please try again later.";
 
-    // ================== APPLICATION ERRORS ==================
     if (
         error instanceof ExpressError &&
         Number.isInteger(error.statusCode) &&
@@ -21,7 +19,6 @@ function errorMiddleware(error, req, res, next) {
         message = error.message;
     }
 
-    // ================== DUPLICATE KEY ERRORS ==================
     if (error.code === 11000) {
         const fields = Object.keys(error.keyPattern || error.keyValue || {});
 
@@ -36,7 +33,6 @@ function errorMiddleware(error, req, res, next) {
         }
     }
 
-    // ================== REQUEST BODY ERRORS ==================
     if (error.type === "entity.parse.failed" && error.status === 400) {
         statusCode = 400;
         message = "Invalid JSON in request body.";
@@ -47,7 +43,6 @@ function errorMiddleware(error, req, res, next) {
         message = "Request body is too large.";
     }
 
-    // ================== SERVER ERROR LOGGING ==================
     if (statusCode >= 500) {
         if (process.env.NODE_ENV !== "production") {
             console.error("Server error:", error.stack || error.message);
@@ -56,12 +51,11 @@ function errorMiddleware(error, req, res, next) {
         }
     }
 
-    // ================== ERROR RESPONSE ==================
     return res.status(statusCode).json({
         success: false,
         message,
     });
 }
 
-// ================== EXPORT ==================
+// Export
 module.exports = errorMiddleware;

@@ -1,7 +1,6 @@
-
 const ExpressError = require("../utils/ExpressError");
 
-// ================== REQUEST VALIDATION ==================
+// Request validation
 function validateMiddleware(schema, { source = "body", jsonFields = [] } = {}) {
     const allowedSources = ["body", "params", "query"];
 
@@ -10,7 +9,6 @@ function validateMiddleware(schema, { source = "body", jsonFields = [] } = {}) {
     }
 
     return (req, res, next) => {
-        // ================== PARSE JSON FIELDS ==================
         if (source === "body") {
             for (const field of jsonFields) {
                 const fieldValue = req.body?.[field];
@@ -20,22 +18,17 @@ function validateMiddleware(schema, { source = "body", jsonFields = [] } = {}) {
                 }
 
                 if (typeof fieldValue !== "string") {
-                    return next(
-                        new ExpressError(400, `${field} must be sent as JSON text.`)
-                    );
+                    return next(new ExpressError(400, `${field} must be sent as JSON text.`));
                 }
 
                 try {
                     req.body[field] = JSON.parse(fieldValue);
                 } catch {
-                    return next(
-                        new ExpressError(400, `${field} contains invalid JSON.`)
-                    );
+                    return next(new ExpressError(400, `${field} contains invalid JSON.`));
                 }
             }
         }
 
-        // ================== VALIDATE REQUEST ==================
         const { error, value } = schema.validate(req[source], {
             abortEarly: false,
             convert: true,
@@ -43,14 +36,11 @@ function validateMiddleware(schema, { source = "body", jsonFields = [] } = {}) {
         });
 
         if (error) {
-            const message = error.details
-                .map((detail) => detail.message)
-                .join(" ");
+            const message = error.details.map((detail) => detail.message).join(" ");
 
             return next(new ExpressError(400, message));
         }
 
-        // ================== VALIDATED DATA ==================
         req.validated = req.validated || {};
         req.validated[source] = value;
 
@@ -62,5 +52,5 @@ function validateMiddleware(schema, { source = "body", jsonFields = [] } = {}) {
     };
 }
 
-// ================== EXPORT ==================
+// Export
 module.exports = validateMiddleware;

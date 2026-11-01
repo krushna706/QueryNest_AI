@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const Conversation = require("../models/Conversation");
@@ -14,12 +13,12 @@ const { extractDocx } = require("../services/documents/docxExtractor");
 const { chunkDocumentText } = require("../services/documents/chunkService");
 const { embedDocumentChunks } = require("../services/retrieval/embeddingService");
 
-// ================== DOCUMENT LIMITS ==================
+// Document limits
 const MAX_FILES = APP_USAGE_LIMITS.maxPdfPerConversation;
 const MAX_PDF_PAGES = APP_USAGE_LIMITS.maxPagesPerConversation;
 const MAX_DOCX_TOKENS = 20000;
 
-// ================== PUBLIC DOCUMENT RESPONSE ==================
+// Public document response
 function toDocumentResponse(document) {
     return {
         _id: document._id,
@@ -39,17 +38,13 @@ function toDocumentResponse(document) {
     };
 }
 
-// ================== VERIFY CONVERSATION OWNERSHIP ==================
+// Verify conversation ownership
 function getOwnedConversation(req, { allowNew = false } = {}) {
     if (!req.user?._id) {
         throw new ExpressError(401, "Please login to continue.");
     }
 
-    if (
-        allowNew &&
-        !req.conversation &&
-        !req.params?.conversationId
-    ) {
+    if (allowNew && !req.conversation && !req.params?.conversationId) {
         return {
             userId: req.user._id,
             conversationId: null,
@@ -70,7 +65,7 @@ function getOwnedConversation(req, { allowNew = false } = {}) {
     };
 }
 
-// ================== READ EXISTING DOCUMENT ALLOWANCE ==================
+// Read existing document allowance
 async function readDocumentAllowance(userId, conversationId, session) {
     const query = Document.find({
         userId,
@@ -86,19 +81,10 @@ async function readDocumentAllowance(userId, conversationId, session) {
 
     const existing = await query.lean();
 
-    // ================== CHECK PENDING UPLOADS ==================
-    if (
-        existing.some(
-            (document) => document.status !== "ready"
-        )
-    ) {
-        throw new ExpressError(
-            409,
-            "Another document upload is processing. Try again after it completes."
-        );
+    if (existing.some((document) => document.status !== "ready")) {
+        throw new ExpressError(409, "Another document upload is processing. Try again after it completes.");
     }
 
-    // ================== COUNT PDF PAGES ==================
     let pagesUsed = 0;
 
     for (const document of existing) {
@@ -106,14 +92,8 @@ async function readDocumentAllowance(userId, conversationId, session) {
             continue;
         }
 
-        if (
-            !Number.isSafeInteger(document.pageCount) ||
-            document.pageCount < 1
-        ) {
-            throw new ExpressError(
-                409,
-                "Existing PDF page information is incomplete."
-            );
+        if (!Number.isSafeInteger(document.pageCount) || document.pageCount < 1) {
+            throw new ExpressError(409, "Existing PDF page information is incomplete.");
         }
 
         pagesUsed += document.pageCount;
@@ -125,114 +105,71 @@ async function readDocumentAllowance(userId, conversationId, session) {
     };
 }
 
-// ================== VALIDATE CONVERSATION LIMITS ==================
-function checkDocumentAllowance(
-    allowance,
-    newFileCount,
-    newPageCount
-) {
-    if (
-        allowance.filesUsed + newFileCount >
-        MAX_FILES
-    ) {
-        throw new ExpressError(
-            409,
-            `Only ${MAX_FILES} documents are allowed per conversation.`
-        );
+// Validate conversation limits
+function checkDocumentAllowance(allowance, newFileCount, newPageCount) {
+    if (allowance.filesUsed + newFileCount > MAX_FILES) {
+        throw new ExpressError(409, `Only ${MAX_FILES} documents are allowed per conversation.`);
     }
 
-    if (
-        allowance.pagesUsed + newPageCount >
-        MAX_PDF_PAGES
-    ) {
-        throw new ExpressError(
-            413,
-            `PDF documents cannot exceed ${MAX_PDF_PAGES} pages combined.`
-        );
+    if (allowance.pagesUsed + newPageCount > MAX_PDF_PAGES) {
+        throw new ExpressError(413, `PDF documents cannot exceed ${MAX_PDF_PAGES} pages combined.`);
     }
 }
 
-// ================== EXTRACT, CHUNK AND EMBED ==================
+// Extract, chunk and embed
 async function prepareDocument(file, remainingPages, signal) {
-    // ================== VALIDATE FILE ==================
-    if (
-        !Buffer.isBuffer(file.buffer) ||
-        !["pdf", "docx"].includes(file.fileType)
-    ) {
-        throw new ExpressError(
-            400,
-            "Invalid uploaded document."
-        );
+    if (!Buffer.isBuffer(file.buffer) || !["pdf", "docx"].includes(file.fileType)) {
+        throw new ExpressError(400, "Invalid uploaded document.");
     }
 
-    // ================== EXTRACT DOCUMENT ==================
-    const extracted = file.fileType === "pdf"
-        ? await extractPdf(file.buffer, {
-            remainingPages,
-            signal,
-        })
-        : await extractDocx(file.buffer, {
-            fileName: file.originalname,
-            signal,
-        });
+    const extracted =
+        file.fileType === "pdf"
+            ? await extractPdf(file.buffer, {
+                  remainingPages,
+                  signal,
+              })
+            : await extractDocx(file.buffer, {
+                  fileName: file.originalname,
+                  signal,
+              });
 
-    // ================== GENERATE TEXT CHUNKS ==================
     const result = chunkDocumentText({
         fileType: file.fileType,
         pages: extracted.pages,
         paragraphs: extracted.paragraphs,
     });
 
-    // ================== DOCX TOKEN LIMIT ==================
-    if (
-        file.fileType === "docx" &&
-        result.extractedTokenCount > MAX_DOCX_TOKENS
-    ) {
-        throw new ExpressError(
-            413,
-            `DOCX extracted text cannot exceed ${MAX_DOCX_TOKENS} estimated tokens.`
-        );
+    if (file.fileType === "docx" && result.extractedTokenCount > MAX_DOCX_TOKENS) {
+        throw new ExpressError(413, `DOCX extracted text cannot exceed ${MAX_DOCX_TOKENS} estimated tokens.`);
     }
 
     if (signal.aborted) {
-        throw new ExpressError(
-            408,
-            "Document upload cancelled."
-        );
+        throw new ExpressError(408, "Document upload cancelled.");
     }
 
-    // ================== GENERATE EMBEDDINGS ==================
-    const chunks = await embedDocumentChunks(
-        result.chunks,
-        {
-            title: file.originalname,
-            signal,
-        }
-    );
+    const chunks = await embedDocumentChunks(result.chunks, {
+        title: file.originalname,
+        signal,
+    });
 
-    // ================== PREPARED DOCUMENT ==================
     return {
         originalName: file.originalname,
         fileType: file.fileType,
         mimeType: file.mimeType,
         sizeBytes: file.buffer.length,
 
-        pageCount: file.fileType === "pdf"
-            ? extracted.pageCount
-            : null,
+        pageCount: file.fileType === "pdf" ? extracted.pageCount : null,
 
         extractedText: extracted.extractedText,
-        extractedCharCount:
-            result.extractedCharCount,
-        extractedTokenCount:
-            result.extractedTokenCount,
+        extractedCharCount: result.extractedCharCount,
+        extractedTokenCount: result.extractedTokenCount,
 
         chunkCount: chunks.length,
         chunks,
     };
 }
 
-// ================== UPLOAD DOCUMENTS ==================
+// Upload documents
 async function uploadDocuments(req, res, next) {
     const files = req.files;
 
@@ -245,65 +182,34 @@ async function uploadDocuments(req, res, next) {
     res.once("close", onDisconnect);
 
     try {
-        // ================== VERIFY USER ==================
-        const {
-            userId,
-            conversationId,
-        } = getOwnedConversation(req, {
+        const { userId, conversationId } = getOwnedConversation(req, {
             allowNew: true,
         });
 
-        // ================== VALIDATE FILE COUNT ==================
-        if (
-            !Array.isArray(files) ||
-            files.length < 1 ||
-            files.length > MAX_FILES
-        ) {
-            throw new ExpressError(
-                400,
-                "Upload 1 to 3 PDF or DOCX files."
-            );
+        if (!Array.isArray(files) || files.length < 1 || files.length > MAX_FILES) {
+            throw new ExpressError(400, "Upload 1 to 3 PDF or DOCX files.");
         }
 
-        // ================== CHECK EXISTING ALLOWANCE ==================
         const initialAllowance = conversationId
-            ? await readDocumentAllowance(
-                userId,
-                conversationId
-            )
+            ? await readDocumentAllowance(userId, conversationId)
             : {
-                filesUsed: 0,
-                pagesUsed: 0,
-            };
+                  filesUsed: 0,
+                  pagesUsed: 0,
+              };
 
-        checkDocumentAllowance(
-            initialAllowance,
-            files.length,
-            0
-        );
+        checkDocumentAllowance(initialAllowance, files.length, 0);
 
-        // ================== PROCESS DOCUMENTS ==================
         const prepared = [];
         let newPageCount = 0;
 
         for (const file of files) {
             if (controller.signal.aborted) {
-                throw new ExpressError(
-                    408,
-                    "Document upload cancelled."
-                );
+                throw new ExpressError(408, "Document upload cancelled.");
             }
 
-            const remainingPages =
-                MAX_PDF_PAGES -
-                initialAllowance.pagesUsed -
-                newPageCount;
+            const remainingPages = MAX_PDF_PAGES - initialAllowance.pagesUsed - newPageCount;
 
-            const result = await prepareDocument(
-                file,
-                remainingPages,
-                controller.signal
-            );
+            const result = await prepareDocument(file, remainingPages, controller.signal);
 
             prepared.push(result);
 
@@ -313,171 +219,127 @@ async function uploadDocuments(req, res, next) {
             file.buffer = null;
         }
 
-        checkDocumentAllowance(
-            initialAllowance,
-            prepared.length,
-            newPageCount
-        );
+        checkDocumentAllowance(initialAllowance, prepared.length, newPageCount);
 
         if (controller.signal.aborted) {
-            throw new ExpressError(
-                408,
-                "Document upload cancelled."
-            );
+            throw new ExpressError(408, "Document upload cancelled.");
         }
 
-        // ================== ATOMIC DATABASE TRANSACTION ==================
-        const result = await mongoose.connection.transaction(
-            async (session) => {
-                let activeId = conversationId;
-                let newConversation = null;
+        const result = await mongoose.connection.transaction(async (session) => {
+            let activeId = conversationId;
+            let newConversation = null;
 
-                // ================== EXISTING CONVERSATION ==================
-                if (activeId) {
-                    const updated =
-                        await Conversation.updateOne(
-                            {
-                                _id: activeId,
-                                userId,
-                                status: "active",
-                            },
-                            {
-                                $currentDate: {
-                                    lastActivityAt: true,
-                                },
-                            },
-                            { session }
-                        );
+            if (activeId) {
+                const updated = await Conversation.updateOne(
+                    {
+                        _id: activeId,
+                        userId,
+                        status: "active",
+                    },
+                    {
+                        $currentDate: {
+                            lastActivityAt: true,
+                        },
+                    },
+                    { session }
+                );
 
-                    if (updated.matchedCount !== 1) {
-                        throw new ExpressError(
-                            404,
-                            "Conversation not found."
-                        );
-                    }
+                if (updated.matchedCount !== 1) {
+                    throw new ExpressError(404, "Conversation not found.");
+                }
 
-                    // Recheck limits within the transaction.
-                    const allowance =
-                        await readDocumentAllowance(
-                            userId,
-                            activeId,
-                            session
-                        );
+                // Recheck limits within the transaction.
+                const allowance = await readDocumentAllowance(userId, activeId, session);
 
-                    checkDocumentAllowance(
-                        allowance,
-                        prepared.length,
-                        newPageCount
-                    );
-
-                // ================== NEW CONVERSATION ==================
-                } else {
-                    const title = prepared[0].originalName
+                checkDocumentAllowance(allowance, prepared.length, newPageCount);
+            } else {
+                const title =
+                    prepared[0].originalName
                         .replace(/\.(pdf|docx)$/i, "")
                         .trim()
                         .slice(0, 120) || "New Chat";
 
-                    [newConversation] =
-                        await Conversation.create(
-                            [{
-                                userId,
-                                title,
-                                status: "active",
-                                lastActivityAt: new Date(),
-                            }],
-                            { session }
-                        );
-
-                    activeId = newConversation._id;
-                }
-
-                // ================== SAVE DOCUMENT METADATA ==================
-                const documents = await Document.create(
-                    prepared.map((item) => ({
-                        userId,
-                        conversationId: activeId,
-
-                        originalName: item.originalName,
-                        fileType: item.fileType,
-                        mimeType: item.mimeType,
-                        sizeBytes: item.sizeBytes,
-
-                        pageCount: item.pageCount,
-                        extractedText: item.extractedText,
-                        extractedCharCount:
-                            item.extractedCharCount,
-                        extractedTokenCount:
-                            item.extractedTokenCount,
-                        chunkCount: item.chunkCount,
-
-                        status: "ready",
-                        processedAt: new Date(),
-                    })),
+                [newConversation] = await Conversation.create(
+                    [
+                        {
+                            userId,
+                            title,
+                            status: "active",
+                            lastActivityAt: new Date(),
+                        },
+                    ],
                     { session }
                 );
 
-                // ================== PREPARE VECTOR RECORDS ==================
-                const chunkRecords = documents.flatMap(
-                    (document, index) =>
-                        prepared[index].chunks.map(
-                            (chunk) => ({
-                                userId,
-                                conversationId: activeId,
-                                documentId: document._id,
+                activeId = newConversation._id;
+            }
 
-                                fileType: chunk.fileType,
-                                chunkIndex: chunk.chunkIndex,
-
-                                text: chunk.text,
-                                tokenCount: chunk.tokenCount,
-
-                                pageNumber: chunk.pageNumber,
-                                sectionTitle: chunk.sectionTitle,
-                                paragraphStart:
-                                    chunk.paragraphStart,
-                                paragraphEnd:
-                                    chunk.paragraphEnd,
-
-                                embeddingModel:
-                                    chunk.embeddingModel,
-                                embedding: chunk.embedding,
-                            })
-                        )
-                );
-
-                // ================== SAVE VECTOR CHUNKS ==================
-                await DocumentChunk.insertMany(
-                    chunkRecords,
-                    {
-                        session,
-                        ordered: true,
-                    }
-                );
-
-                // ================== TRANSACTION RESULT ==================
-                return {
+            const documents = await Document.create(
+                prepared.map((item) => ({
+                    userId,
                     conversationId: activeId,
 
-                    conversation: newConversation
-                        ? {
-                            _id: newConversation._id,
-                            title: newConversation.title,
-                            status: newConversation.status,
-                            lastActivityAt:
-                                newConversation.lastActivityAt,
-                            createdAt:
-                                newConversation.createdAt,
-                        }
-                        : null,
+                    originalName: item.originalName,
+                    fileType: item.fileType,
+                    mimeType: item.mimeType,
+                    sizeBytes: item.sizeBytes,
 
-                    documents: documents.map(
-                        toDocumentResponse
-                    ),
-                };
-            }
-        );
+                    pageCount: item.pageCount,
+                    extractedText: item.extractedText,
+                    extractedCharCount: item.extractedCharCount,
+                    extractedTokenCount: item.extractedTokenCount,
+                    chunkCount: item.chunkCount,
 
-        // ================== SUCCESS RESPONSE ==================
+                    status: "ready",
+                    processedAt: new Date(),
+                })),
+                { session }
+            );
+
+            const chunkRecords = documents.flatMap((document, index) =>
+                prepared[index].chunks.map((chunk) => ({
+                    userId,
+                    conversationId: activeId,
+                    documentId: document._id,
+
+                    fileType: chunk.fileType,
+                    chunkIndex: chunk.chunkIndex,
+
+                    text: chunk.text,
+                    tokenCount: chunk.tokenCount,
+
+                    pageNumber: chunk.pageNumber,
+                    sectionTitle: chunk.sectionTitle,
+                    paragraphStart: chunk.paragraphStart,
+                    paragraphEnd: chunk.paragraphEnd,
+
+                    embeddingModel: chunk.embeddingModel,
+                    embedding: chunk.embedding,
+                }))
+            );
+
+            await DocumentChunk.insertMany(chunkRecords, {
+                session,
+                ordered: true,
+            });
+
+            return {
+                conversationId: activeId,
+
+                conversation: newConversation
+                    ? {
+                          _id: newConversation._id,
+                          title: newConversation.title,
+                          status: newConversation.status,
+                          lastActivityAt: newConversation.lastActivityAt,
+                          createdAt: newConversation.createdAt,
+                      }
+                    : null,
+
+                documents: documents.map(toDocumentResponse),
+            };
+        });
+
         res.set("Cache-Control", "no-store");
 
         return res.status(201).json({
@@ -485,15 +347,11 @@ async function uploadDocuments(req, res, next) {
             message: "Document(s) processed successfully.",
             ...result,
         });
-
     } catch (error) {
         return next(error);
-
     } finally {
-        // ================== REMOVE EVENT LISTENER ==================
         res.off("close", onDisconnect);
 
-        // ================== RELEASE ORIGINAL BUFFERS ==================
         if (Array.isArray(files)) {
             for (const file of files) {
                 file.buffer = null;
@@ -504,15 +362,11 @@ async function uploadDocuments(req, res, next) {
     }
 }
 
-// ================== LIST CONVERSATION DOCUMENTS ==================
+// List conversation documents
 async function getDocuments(req, res, next) {
     try {
-        const {
-            userId,
-            conversationId,
-        } = getOwnedConversation(req);
+        const { userId, conversationId } = getOwnedConversation(req);
 
-        // ================== FETCH OWNED DOCUMENTS ==================
         const documents = await Document.find({
             userId,
             conversationId,
@@ -527,139 +381,104 @@ async function getDocuments(req, res, next) {
             .select("-extractedText")
             .lean();
 
-        // ================== RESPONSE ==================
         res.set("Cache-Control", "no-store");
 
         return res.status(200).json({
             success: true,
-            documents: documents.map(
-                toDocumentResponse
-            ),
+            documents: documents.map(toDocumentResponse),
         });
-
     } catch (error) {
         return next(error);
     }
 }
 
-// ================== DELETE DOCUMENT ==================
+// Delete document
 async function deleteDocument(req, res, next) {
     try {
-        const {
-            userId,
-            conversationId,
-        } = getOwnedConversation(req);
+        const { userId, conversationId } = getOwnedConversation(req);
 
-        const documentId =
-            req.validated?.params?.documentId ??
-            req.params?.documentId;
+        const documentId = req.validated?.params?.documentId ?? req.params?.documentId;
 
-        // ================== VALIDATE DOCUMENT ID ==================
-        if (
-            typeof documentId !== "string" ||
-            !/^[a-f\d]{24}$/i.test(documentId)
-        ) {
-            throw new ExpressError(
-                400,
-                "Invalid document ID."
-            );
+        if (typeof documentId !== "string" || !/^[a-f\d]{24}$/i.test(documentId)) {
+            throw new ExpressError(400, "Invalid document ID.");
         }
 
-        const id = new mongoose.Types.ObjectId(
-            documentId
-        );
+        const id = new mongoose.Types.ObjectId(documentId);
 
-        // ================== ATOMIC DELETE ==================
-        await mongoose.connection.transaction(
-            async (session) => {
-                // ================== LOCK CONVERSATION ==================
-                const updated =
-                    await Conversation.updateOne(
-                        {
-                            _id: conversationId,
-                            userId,
-                            status: "active",
+        await mongoose.connection.transaction(async (session) => {
+            const updated = await Conversation.updateOne(
+                {
+                    _id: conversationId,
+                    userId,
+                    status: "active",
+                },
+                {
+                    $currentDate: {
+                        lastActivityAt: true,
+                    },
+                },
+                { session }
+            );
+
+            if (updated.matchedCount !== 1) {
+                throw new ExpressError(404, "Conversation not found.");
+            }
+
+            const document = await Document.findOne({
+                _id: id,
+                userId,
+                conversationId,
+            }).session(session);
+
+            if (!document) {
+                throw new ExpressError(404, "Document not found.");
+            }
+
+            await DocumentChunk.deleteMany(
+                {
+                    userId,
+                    conversationId,
+                    documentId: id,
+                },
+                { session }
+            );
+
+            await Message.updateMany(
+                {
+                    userId,
+                    conversationId,
+                },
+                {
+                    $pull: {
+                        attachmentIds: id,
+                        sources: {
+                            documentId: id,
                         },
-                        {
-                            $currentDate: {
-                                lastActivityAt: true,
-                            },
-                        },
-                        { session }
-                    );
+                    },
+                },
+                { session }
+            );
 
-                if (updated.matchedCount !== 1) {
-                    throw new ExpressError(
-                        404,
-                        "Conversation not found."
-                    );
-                }
-
-                // ================== VERIFY DOCUMENT OWNERSHIP ==================
-                const document = await Document.findOne({
+            await Document.deleteOne(
+                {
                     _id: id,
                     userId,
                     conversationId,
-                }).session(session);
+                },
+                { session }
+            );
+        });
 
-                if (!document) {
-                    throw new ExpressError(
-                        404,
-                        "Document not found."
-                    );
-                }
-
-                // ================== DELETE EMBEDDINGS ==================
-                await DocumentChunk.deleteMany(
-                    {
-                        userId,
-                        conversationId,
-                        documentId: id,
-                    },
-                    { session }
-                );
-
-                // ================== REMOVE MESSAGE REFERENCES ==================
-                await Message.updateMany(
-                    {
-                        userId,
-                        conversationId,
-                    },
-                    {
-                        $pull: {
-                            attachmentIds: id,
-                            sources: {
-                                documentId: id,
-                            },
-                        },
-                    },
-                    { session }
-                );
-
-                // ================== DELETE DOCUMENT ==================
-                await Document.deleteOne(
-                    {
-                        _id: id,
-                        userId,
-                        conversationId,
-                    },
-                    { session }
-                );
-            }
-        );
-
-        // ================== SUCCESS RESPONSE ==================
         return res.status(200).json({
             success: true,
             message: "Document deleted successfully.",
         });
-
     } catch (error) {
         return next(error);
     }
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     uploadDocuments,
     getDocuments,

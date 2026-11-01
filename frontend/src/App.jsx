@@ -1,136 +1,24 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { ToastContainer } from "react-toastify";
 
-import { useAuth } from "./context/AuthContext";
+import ProtectedRoute, { RootRedirect, GuestAccess, ChatAccess } from "./components/common/ProtectedRoute";
+import NotFound from "./components/common/NotFound";
 
-// ================== AUTHENTICATION ==================
+// Authentication
 import Login from "./auth/Login";
 import Signup from "./auth/Signup";
 import ForgotPassword from "./auth/ForgotPassword";
 
-// ================== LAYOUT ==================
+// Layout
 import ChatLayout from "./layouts/ChatLayout";
 
-// ================== USER PANEL ==================
+// User panel
 import ChatDashboard from "./user/ChatDashboard";
 import Conversation from "./user/Conversation";
 import Profile from "./user/Profile";
 
-// ================== SESSION FEEDBACK ==================
-function SessionFeedback() {
-    const { loading, authError, refreshUser } = useAuth();
-
-    return (
-        <section className="container-fluid py-5 text-center">
-            {loading ? (
-                <p role="status">
-                    Checking your session...
-                </p>
-            ) : (
-                <>
-                    <p role="alert">{authError}</p>
-
-                    <button type="button" className="btn btn-primary" onClick={() => refreshUser()}>
-                        Try Again
-                    </button>
-                </>
-            )}
-        </section>
-    );
-}
-
-// ================== ROOT REDIRECT ==================
-function RootRedirect() {
-    const { loading, authError } = useAuth();
-
-    if (loading || authError) {
-        return <SessionFeedback />;
-    }
-
-    return <Navigate to="/chat" replace />;
-}
-
-// ================== GUEST ACCESS ==================
-function GuestAccess() {
-    const { user, loading, authError } = useAuth();
-
-    if (loading || authError) {
-        return <SessionFeedback />;
-    }
-
-    if (user) {
-        return <Navigate to="/chat" replace />;
-    }
-
-    return <Outlet />;
-}
-
-// ================== CHAT ACCESS ==================
-function ChatAccess() {
-    const { user, loading, authError } = useAuth();
-
-    if (loading || authError) {
-        return <SessionFeedback />;
-    }
-
-    if (user && user.role !== "user") {
-        return (
-            <section className="container py-5 text-center">
-                <h2>Access Denied</h2>
-                <p>
-                    You do not have permission to access this page.
-                </p>
-            </section>
-        );
-    }
-
-    return <Outlet />;
-}
-
-// ================== USER ACCESS ==================
-function UserAccess() {
-    const { user, loading, authError } = useAuth();
-
-    if (loading || authError) {
-        return <SessionFeedback />;
-    }
-
-    if (!user) {
-        return (
-            <Navigate to="/chat" replace state={{ authRequired: true }} />
-        );
-    }
-
-    if (user.role !== "user") {
-        return (
-            <section className="container py-5 text-center">
-                <h2>Access Denied</h2>
-                <p>
-                    You do not have permission to access this page.
-                </p>
-            </section>
-        );
-    }
-
-    return <Outlet />;
-}
-
-// ================== NOT FOUND ==================
-function NotFound() {
-    return (
-        <section className="container py-5 text-center">
-            <h2>404 - Page Not Found</h2>
-            <p>The requested page could not be found.</p>
-
-            <Link to="/" className="btn btn-primary">
-                Go Home
-            </Link>
-        </section>
-    );
-}
-
-// ================== APPLICATION ROUTES ==================
+// Application routes
 function App() {
     return (
         <BrowserRouter>
@@ -148,14 +36,12 @@ function App() {
                 <Route element={<ChatAccess />}>
                     <Route element={<ChatLayout />}>
                         <Route path="/chat" element={<ChatDashboard />} />
-                        <Route element={<UserAccess />}>
-
+                        <Route element={<ProtectedRoute />}>
                             {/* Conversation */}
                             <Route path="/chat/:conversationId" element={<Conversation />} />
 
                             {/* My Profile */}
                             <Route path="/profile" element={<Profile />} />
-
                         </Route>
                     </Route>
                 </Route>

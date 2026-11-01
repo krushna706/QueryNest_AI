@@ -5,7 +5,7 @@ const AuthSession = require("../models/AuthSession");
 const ExpressError = require("../utils/ExpressError");
 const generateToken = require("../utils/generateToken");
 
-// ================== USER RESPONSE ==================
+// User response
 function getUserResponse(user) {
     return {
         _id: user._id,
@@ -21,12 +21,12 @@ function getUserResponse(user) {
     };
 }
 
-// ================== AUTHENTICATION CONFIGURATION ==================
+// Authentication configuration
 const COOKIE_NAME = "token";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const PASSWORD_SALT_ROUNDS = 12;
 
-// ================== COOKIE OPTIONS ==================
+// Cookie options
 function getCookieOptions() {
     return {
         httpOnly: true,
@@ -36,7 +36,7 @@ function getCookieOptions() {
     };
 }
 
-// ================== AUTHENTICATION RESPONSE ==================
+// Authentication response
 async function sendAuthResponse(res, user, statusCode, message) {
     const { token, tokenHash, expiresAt } = generateToken(user);
 
@@ -61,7 +61,7 @@ async function sendAuthResponse(res, user, statusCode, message) {
     });
 }
 
-// ================== SIGNUP ==================
+// Signup
 // POST /api/auth/signup
 async function signup(req, res, next) {
     try {
@@ -107,7 +107,7 @@ async function signup(req, res, next) {
     }
 }
 
-// ================== LOGIN ==================
+// Login
 // POST /api/auth/login
 async function login(req, res, next) {
     try {
@@ -116,19 +116,16 @@ async function login(req, res, next) {
         // Find account by email or phone.
         const isEmail = identifier.includes("@");
 
-        const user = await User.findOne(
-            isEmail ? { email: identifier } : { phone: identifier }
-        ).select("+passwordHash +tokenVersion");
+        const user = await User.findOne(isEmail ? { email: identifier } : { phone: identifier }).select(
+            "+passwordHash +tokenVersion"
+        );
 
         if (!user) {
             return next(new ExpressError(401, "Invalid login credentials."));
         }
 
         // Verify password.
-        const passwordMatches = await bcrypt.compare(
-            password,
-            user.passwordHash
-        );
+        const passwordMatches = await bcrypt.compare(password, user.passwordHash);
 
         if (!passwordMatches) {
             return next(new ExpressError(401, "Invalid login credentials."));
@@ -159,23 +156,16 @@ async function login(req, res, next) {
         ).select("+tokenVersion");
 
         if (!currentUser) {
-            return next(
-                new ExpressError(401, "Account details changed. Please login again.")
-            );
+            return next(new ExpressError(401, "Account details changed. Please login again."));
         }
 
-        return await sendAuthResponse(
-            res,
-            currentUser,
-            200,
-            "Login successful."
-        );
+        return await sendAuthResponse(res, currentUser, 200, "Login successful.");
     } catch (error) {
         return next(error);
     }
 }
 
-// ================== LOGOUT ==================
+// Logout
 // POST /api/auth/logout
 async function logout(req, res, next) {
     try {
@@ -205,7 +195,7 @@ async function logout(req, res, next) {
     }
 }
 
-// ================== CURRENT USER ==================
+// Current user
 // GET /api/auth/me
 async function getCurrentUser(req, res, next) {
     try {
@@ -232,7 +222,7 @@ async function getCurrentUser(req, res, next) {
     }
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     signup,
     login,

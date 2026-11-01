@@ -1,14 +1,13 @@
-
- // ================== ENVIRONMENT CONFIGURATION ==================
+// Environment configuration
 require("dotenv").config();
 
 const app = require("./app");
 const connectDB = require("./config/db");
 
-// ================== SERVER CONFIGURATION ==================
+// Server configuration
 const PORT = Number(process.env.PORT);
 
-// ================== START SERVER ==================
+// Start server
 async function startServer() {
     try {
         if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
@@ -32,14 +31,12 @@ async function startServer() {
 
             process.exit(1);
         });
-    } catch (error) {
-        console.error(
-            "Server startup failed. Check PORT, DB_URI and MongoDB Atlas access settings."
-        );
+    } catch {
+        console.error("Server startup failed. Check PORT, DB_URI and MongoDB Atlas access settings.");
 
         process.exit(1);
     }
 }
 
-// ================== INITIALIZE ==================
+// Initialize
 startServer();

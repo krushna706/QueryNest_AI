@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, useMediaQuery } from "@mui/material";
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    IconButton,
+    useMediaQuery,
+} from "@mui/material";
 
 import { useAuth } from "../context/AuthContext";
 import ChatSidebar from "../components/chat/ChatSidebar";
@@ -8,7 +17,7 @@ import ChatHistory from "../components/chat/ChatHistory";
 
 import "../css/panel.css";
 
-// ================== CHAT LAYOUT ==================
+// Chat layout
 function ChatLayout() {
     const isMobile = useMediaQuery("(max-width: 767.98px)");
     const location = useLocation();
@@ -55,12 +64,7 @@ function ChatLayout() {
             replace: true,
             state: null,
         });
-    }, [
-        isGuest,
-        location.pathname,
-        location.state,
-        navigate,
-    ]);
+    }, [isGuest, location.pathname, location.state, navigate]);
 
     const handleToggleSidebar = () => {
         if (isMobile) {
@@ -88,12 +92,10 @@ function ChatLayout() {
         setNewChatKey((current) => current + 1);
     };
 
-    const showOpenButton = isMobile
-        ? !mobileOpen
-        : !sidebarOpen;
+    const showOpenButton = isMobile ? !mobileOpen : !sidebarOpen;
 
     return (
-        <div className={`chat-layout ${ !isMobile && !sidebarOpen ? "chat-layout-collapsed" : "" }`}>
+        <div className={`chat-layout ${!isMobile && !sidebarOpen ? "chat-layout-collapsed" : ""}`}>
             <ChatSidebar
                 isMobile={isMobile}
                 mobileOpen={mobileOpen}
@@ -106,15 +108,12 @@ function ChatLayout() {
                 onSearchChange={setSearch}
             >
                 {isGuest ? (
-                    <p className="chat-sidebar-empty">
-                        Sign in to access your conversations.
-                    </p>
+                    <p className="chat-sidebar-empty">Sign in to access your conversations.</p>
                 ) : (
                     <ChatHistory search={search} onClose={handleCloseSidebar} />
                 )}
             </ChatSidebar>
             <main className="chat-main">
-
                 {/* Sidebar Reopen */}
                 {showOpenButton && (
                     <div className="chat-floating-menu">
@@ -133,7 +132,7 @@ function ChatLayout() {
 
                 {/* Chat Page */}
                 <div className="chat-main-content">
-                    <Outlet key={newChatKey} context={{ requireAuth, isGuest, }} />
+                    <Outlet key={newChatKey} context={{ requireAuth, isGuest }} />
                 </div>
             </main>
             <Dialog
@@ -151,9 +150,7 @@ function ChatLayout() {
 
                 <DialogContent>
                     <DialogContentText id="guest-auth-description" className="qn-guest-dialog-description">
-                        Sign in to start conversations,
-                        upload documents, and access
-                        your chat history.
+                        Sign in to start conversations, upload documents, and access your chat history.
                     </DialogContentText>
                 </DialogContent>
 
@@ -163,9 +160,7 @@ function ChatLayout() {
                         variant="contained"
                         fullWidth
                         disableElevation
-                        onClick={() =>
-                            handleAuthNavigation("/login")
-                        }
+                        onClick={() => handleAuthNavigation("/login")}
                         className="qn-guest-dialog-signin"
                     >
                         Sign In
@@ -175,15 +170,19 @@ function ChatLayout() {
                         type="button"
                         variant="outlined"
                         fullWidth
-                        onClick={() =>
-                            handleAuthNavigation("/signup")
-                        }
+                        onClick={() => handleAuthNavigation("/signup")}
                         className="qn-guest-dialog-signup"
                     >
                         Create Account
                     </Button>
 
-                    <Button type="button" color="inherit" size="small" onClick={handleCloseAuthDialog} className="qn-guest-dialog-later">
+                    <Button
+                        type="button"
+                        color="inherit"
+                        size="small"
+                        onClick={handleCloseAuthDialog}
+                        className="qn-guest-dialog-later"
+                    >
                         Maybe Later
                     </Button>
                 </DialogActions>

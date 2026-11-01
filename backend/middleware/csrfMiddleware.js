@@ -1,7 +1,6 @@
-
 const ExpressError = require("../utils/ExpressError");
 
-// ================== CSRF PROTECTION ==================
+// Csrf protection
 function csrfMiddleware(req, res, next) {
     // Skip safe HTTP methods.
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
@@ -32,5 +31,5 @@ function csrfMiddleware(req, res, next) {
     return next();
 }
 
-// ================== EXPORT ==================
+// Export
 module.exports = csrfMiddleware;

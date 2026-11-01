@@ -1,3 +1,9 @@
+const {
+    documentUploadLimiter,
+    chatReadLimiter,
+    chatWriteLimiter,
+    chatDailyWriteLimiter,
+} = require("../middleware/rateLimiter");
 const express = require("express");
 
 const documentController = require("../controllers/documentController");
@@ -9,22 +15,22 @@ const { uploadDocumentFiles } = require("../middleware/uploadMiddleware");
 
 const { conversationParamsSchema, deleteDocumentParamsSchema } = require("../validations/schema");
 
-// ================== ROUTER SETUP ==================
+// Router setup
 const router = express.Router();
 
-// ================== AUTHENTICATION ==================
+// Authentication
 router.use(authMiddleware);
 
 // POST /api/documents
-router.post("/", uploadDocumentFiles, documentController.uploadDocuments);
+router.post("/", documentUploadLimiter, chatDailyWriteLimiter, uploadDocumentFiles, documentController.uploadDocuments);
 
 // POST /api/documents/:conversationId
-router.post("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, uploadDocumentFiles, documentController.uploadDocuments);
+router.post("/:conversationId", documentUploadLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, uploadDocumentFiles, documentController.uploadDocuments);
 
 // GET /api/documents/:conversationId
-router.get("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, documentController.getDocuments);
+router.get("/:conversationId", chatReadLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, documentController.getDocuments);
 
 // DELETE /api/documents/:conversationId/:documentId
-router.delete("/:conversationId/:documentId", validateMiddleware(deleteDocumentParamsSchema, { source: "params" }), ownershipMiddleware, documentController.deleteDocument);
+router.delete("/:conversationId/:documentId", chatWriteLimiter, validateMiddleware(deleteDocumentParamsSchema, { source: "params" }), ownershipMiddleware, documentController.deleteDocument);
 
 module.exports = router;

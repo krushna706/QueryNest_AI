@@ -1,13 +1,12 @@
-
 const AI_PROVIDERS = {
-    // ================== GROQ CONFIGURATION ==================
+    // Groq configuration
     groq: {
         name: "Groq",
         model: "openai/gpt-oss-120b",
         apiKeyEnv: "GROQ_API_KEY",
     },
 
-    // ================== GEMINI CONFIGURATION ==================
+    // Gemini configuration
     gemini: {
         name: "Gemini",
         model: "gemini-3.5-flash-lite",
@@ -15,12 +14,12 @@ const AI_PROVIDERS = {
     },
 };
 
-// ================== DEFAULT AI PROVIDER ==================
+// Default ai provider
 // Prefer Groq for general chat and coding tasks.
 // Final provider selection will happen in aiRouter.js.
 const DEFAULT_AI_PROVIDER = "groq";
 
-// ================== EMBEDDING CONFIGURATION ==================
+// Embedding configuration
 // Generate embeddings for document chunks and user questions.
 const EMBEDDING_CONFIG = {
     provider: "gemini",
@@ -28,7 +27,7 @@ const EMBEDDING_CONFIG = {
     dimensions: 768,
 };
 
-// ================== GET AI PROVIDER CONFIGURATION ==================
+// Get ai provider configuration
 // Read and validate credentials only when a provider is needed.
 function getAIProviderConfig(provider) {
     const config = AI_PROVIDERS[provider];
@@ -52,7 +51,7 @@ function getAIProviderConfig(provider) {
     };
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     AI_PROVIDERS,
     DEFAULT_AI_PROVIDER,

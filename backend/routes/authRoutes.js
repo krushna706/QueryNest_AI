@@ -15,9 +15,15 @@ const {
     forgotPasswordResetLimiter,
 } = require("../middleware/rateLimiter");
 
-const { signupSchema, loginSchema, forgotPasswordRequestSchema, forgotPasswordVerifySchema, forgotPasswordResetSchema } = require("../validations/schema");
+const {
+    signupSchema,
+    loginSchema,
+    forgotPasswordRequestSchema,
+    forgotPasswordVerifySchema,
+    forgotPasswordResetSchema,
+} = require("../validations/schema");
 
-// ================== ROUTER SETUP ==================
+// Router setup
 const router = express.Router();
 
 router.post("/signup", signupLimiter, validateMiddleware(signupSchema), authController.signup);

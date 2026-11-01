@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } = require("node:crypto");
@@ -8,9 +7,9 @@ const PasswordReset = require("../models/PasswordReset");
 const AuthSession = require("../models/AuthSession");
 const ExpressError = require("../utils/ExpressError");
 
-const { sendPasswordResetOtpEmail, OTP_VALIDITY_MINUTES } = require("../config/email");
+const { sendPasswordResetOtpEmail, OTP_VALIDITY_MINUTES } = require("../services/emailService");
 
-// ================== PASSWORD RESET CONFIGURATION ==================
+// Password reset configuration
 const OTP_COOLDOWN_MS = 60 * 1000;
 const OTP_WINDOW_MS = 60 * 60 * 1000;
 const MAX_OTP_REQUESTS_PER_HOUR = 10;
@@ -23,19 +22,17 @@ const GENERIC_REQUEST_MESSAGE =
 
 const INVALID_OTP_MESSAGE = "Invalid or expired verification code.";
 
-// ================== RESPONSE HELPER ==================
+// Response helper
 function sendNoCache(res, statusCode, data) {
     res.set("Cache-Control", "no-store");
     return res.status(statusCode).json(data);
 }
 
-// ================== FIND ACCOUNT ==================
+// Find account
 async function findRecoveryAccount(identifier) {
     const normalized = identifier.trim().toLowerCase();
 
-    const query = normalized.includes("@")
-        ? { email: normalized }
-        : { phone: normalized };
+    const query = normalized.includes("@") ? { email: normalized } : { phone: normalized };
 
     return User.findOne({
         ...query,
@@ -43,7 +40,7 @@ async function findRecoveryAccount(identifier) {
     });
 }
 
-// ================== OTP HASH ==================
+// Otp hash
 function otpDigest(userId, otp) {
     const secret = process.env.JWT_SECRET;
 
@@ -51,34 +48,24 @@ function otpDigest(userId, otp) {
         throw new Error("JWT_SECRET is missing or too short.");
     }
 
-    return createHmac("sha256", secret)
-        .update(`querynest-ai:password-reset:${userId}:${otp}`)
-        .digest("hex");
+    return createHmac("sha256", secret).update(`querynest-ai:password-reset:${userId}:${otp}`).digest("hex");
 }
 
-// ================== RESET TOKEN HASH ==================
+// Reset token hash
 function tokenDigest(token) {
-    return createHash("sha256")
-        .update(token)
-        .digest("hex");
+    return createHash("sha256").update(token).digest("hex");
 }
 
-// ================== COMPARE HASHES ==================
+// Compare hashes
 function sameHash(first, second) {
-    if (
-        !/^[a-f0-9]{64}$/.test(first || "") ||
-        !/^[a-f0-9]{64}$/.test(second || "")
-    ) {
+    if (!/^[a-f0-9]{64}$/.test(first || "") || !/^[a-f0-9]{64}$/.test(second || "")) {
         return false;
     }
 
-    return timingSafeEqual(
-        Buffer.from(first, "hex"),
-        Buffer.from(second, "hex")
-    );
+    return timingSafeEqual(Buffer.from(first, "hex"), Buffer.from(second, "hex"));
 }
 
-// ================== MASK EMAIL ==================
+// Mask email
 function maskedEmail(email) {
     const [local, domain] = String(email || "").split("@");
 
@@ -93,7 +80,7 @@ function maskedEmail(email) {
     return `${local.slice(0, 2)}****${local.slice(-2)}@${domain}`;
 }
 
-// ================== REQUEST PASSWORD RESET OTP ==================
+// Request password reset otp
 async function requestPasswordResetOtp(req, res, next) {
     try {
         const account = await findRecoveryAccount(req.body.identifier);
@@ -108,7 +95,6 @@ async function requestPasswordResetOtp(req, res, next) {
             return sendNoCache(res, 200, response);
         }
 
-        // ================== CHECK OTP LIMITS ==================
         const now = new Date();
         const nowMs = now.getTime();
 
@@ -119,22 +105,14 @@ async function requestPasswordResetOtp(req, res, next) {
         const windowStart = previous?.requestWindowStartedAt?.getTime();
 
         const inCurrentWindow =
-            Number.isFinite(windowStart) &&
-            windowStart <= nowMs &&
-            nowMs - windowStart < OTP_WINDOW_MS;
+            Number.isFinite(windowStart) && windowStart <= nowMs && nowMs - windowStart < OTP_WINDOW_MS;
 
-        const requestsInWindow = inCurrentWindow
-            ? previous.requestsInWindow
-            : 0;
+        const requestsInWindow = inCurrentWindow ? previous.requestsInWindow : 0;
 
-        if (
-            requestsInWindow >= MAX_OTP_REQUESTS_PER_HOUR ||
-            (previous?.resendAvailableAt?.getTime() || 0) > nowMs
-        ) {
+        if (requestsInWindow >= MAX_OTP_REQUESTS_PER_HOUR || (previous?.resendAvailableAt?.getTime() || 0) > nowMs) {
             return sendNoCache(res, 200, response);
         }
 
-        // ================== GENERATE OTP ==================
         const otp = String(randomInt(0, 1000000)).padStart(6, "0");
         const otpHash = otpDigest(account._id, otp);
 
@@ -143,15 +121,12 @@ async function requestPasswordResetOtp(req, res, next) {
             otpExpiresAt: new Date(nowMs + OTP_VALIDITY_MINUTES * 60 * 1000),
             failedAttempts: 0,
             resendAvailableAt: new Date(nowMs + OTP_COOLDOWN_MS),
-            requestWindowStartedAt: inCurrentWindow
-                ? previous.requestWindowStartedAt
-                : now,
+            requestWindowStartedAt: inCurrentWindow ? previous.requestWindowStartedAt : now,
             requestsInWindow: requestsInWindow + 1,
             verificationTokenHash: null,
             verificationExpiresAt: null,
         };
 
-        // ================== SAVE OTP ==================
         let reserved = false;
 
         if (previous) {
@@ -189,7 +164,6 @@ async function requestPasswordResetOtp(req, res, next) {
             return sendNoCache(res, 200, response);
         }
 
-        // ================== SEND EMAIL ==================
         try {
             await sendPasswordResetOtpEmail({
                 toEmail: account.email,
@@ -210,10 +184,7 @@ async function requestPasswordResetOtp(req, res, next) {
                 }
             ).catch(() => {});
 
-            console.error(
-                "Password reset email failed:",
-                error.code || "EMAIL_SEND_FAILED"
-            );
+            console.error("Password reset email failed:", error.code || "EMAIL_SEND_FAILED");
         }
 
         return sendNoCache(res, 200, response);
@@ -222,7 +193,7 @@ async function requestPasswordResetOtp(req, res, next) {
     }
 }
 
-// ================== VERIFY PASSWORD RESET OTP ==================
+// Verify password reset otp
 async function verifyPasswordResetOtp(req, res, next) {
     try {
         const { identifier, otp } = req.body;
@@ -248,7 +219,6 @@ async function verifyPasswordResetOtp(req, res, next) {
             return next(new ExpressError(400, INVALID_OTP_MESSAGE));
         }
 
-        // ================== VERIFY OTP ==================
         const incomingHash = otpDigest(account._id, otp);
 
         if (!sameHash(stored.otpHash, incomingHash)) {
@@ -267,7 +237,6 @@ async function verifyPasswordResetOtp(req, res, next) {
             return next(new ExpressError(400, INVALID_OTP_MESSAGE));
         }
 
-        // ================== CREATE RESET TOKEN ==================
         const resetToken = randomBytes(32).toString("hex");
         const verificationTokenHash = tokenDigest(resetToken);
 
@@ -283,9 +252,7 @@ async function verifyPasswordResetOtp(req, res, next) {
                     otpHash: null,
                     otpExpiresAt: null,
                     verificationTokenHash,
-                    verificationExpiresAt: new Date(
-                        now.getTime() + RESET_TOKEN_VALIDITY_MS
-                    ),
+                    verificationExpiresAt: new Date(now.getTime() + RESET_TOKEN_VALIDITY_MS),
                 },
             },
             {
@@ -309,7 +276,7 @@ async function verifyPasswordResetOtp(req, res, next) {
     }
 }
 
-// ================== RESET PASSWORD ==================
+// Reset password
 async function resetPassword(req, res, next) {
     try {
         const { resetToken, newPassword } = req.body;
@@ -317,7 +284,6 @@ async function resetPassword(req, res, next) {
         const verificationTokenHash = tokenDigest(resetToken);
         const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
-        // ================== UPDATE PASSWORD AND SESSIONS ==================
         await mongoose.connection.transaction(async (session) => {
             const now = new Date();
 
@@ -341,10 +307,7 @@ async function resetPassword(req, res, next) {
             );
 
             if (!resetRecord) {
-                throw new ExpressError(
-                    400,
-                    "Password reset session has expired or was already used."
-                );
+                throw new ExpressError(400, "Password reset session has expired or was already used.");
             }
 
             const updated = await User.updateOne(
@@ -385,7 +348,6 @@ async function resetPassword(req, res, next) {
             );
         });
 
-        // ================== CLEAR LOGIN COOKIE ==================
         res.clearCookie("token", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -403,7 +365,7 @@ async function resetPassword(req, res, next) {
     }
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     requestPasswordResetOtp,
     verifyPasswordResetOtp,

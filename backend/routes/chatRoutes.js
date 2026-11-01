@@ -1,3 +1,4 @@
+const { chatReadLimiter, chatWriteLimiter, chatDailyWriteLimiter } = require("../middleware/rateLimiter");
 const express = require("express");
 
 const chatController = require("../controllers/chatController");
@@ -15,26 +16,26 @@ const {
     generateAISchema,
 } = require("../validations/schema");
 
-// ================== ROUTER SETUP ==================
+// Router setup
 const router = express.Router();
 
-// ================== AUTHENTICATION ==================
+// Authentication
 router.use(authMiddleware);
 
-router.post("/", validateMiddleware(chatMessageSchema), chatController.createConversation);
+router.post("/", chatWriteLimiter, chatDailyWriteLimiter, validateMiddleware(chatMessageSchema), chatController.createConversation);
 
-router.get("/", validateMiddleware(chatHistoryQuerySchema, { source: "query" }), chatController.getChatHistory);
+router.get("/", chatReadLimiter, validateMiddleware(chatHistoryQuerySchema, { source: "query" }), chatController.getChatHistory);
 
-router.get("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.getConversation);
+router.get("/:conversationId", chatReadLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.getConversation);
 
-router.patch("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(renameConversationSchema), chatController.renameConversation);
+router.patch("/:conversationId", chatWriteLimiter, chatDailyWriteLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(renameConversationSchema), chatController.renameConversation);
 
-router.delete("/:conversationId", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.deleteConversation);
+router.delete("/:conversationId", chatWriteLimiter, chatDailyWriteLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, chatController.deleteConversation);
 
-router.post("/:conversationId/messages", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(chatMessageSchema), chatController.addUserMessage);
+router.post("/:conversationId/messages", chatWriteLimiter, chatDailyWriteLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(chatMessageSchema), chatController.addUserMessage);
 
-router.get("/:conversationId/messages", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(messageHistoryQuerySchema, { source: "query" }), chatController.getMessageHistory);
+router.get("/:conversationId/messages", chatReadLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(messageHistoryQuerySchema, { source: "query" }), chatController.getMessageHistory);
 
-router.post("/:conversationId/generate", validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(generateAISchema), chatController.generateAIResponse);
+router.post("/:conversationId/generate", chatWriteLimiter, validateMiddleware(conversationParamsSchema, { source: "params" }), ownershipMiddleware, validateMiddleware(generateAISchema), chatController.generateAIResponse);
 
 module.exports = router;

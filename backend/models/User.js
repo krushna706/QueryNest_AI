@@ -1,12 +1,11 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== USER SCHEMA ==================
+// User schema
 const userSchema = new Schema(
     {
-        // ================== BASIC DETAILS ==================
+        // Basic details
         name: {
             type: String,
             required: true,
@@ -33,7 +32,7 @@ const userSchema = new Schema(
             immutable: true,
         },
 
-        // ================== AUTHENTICATION ==================
+        // Authentication
         passwordHash: {
             type: String,
             required: true,
@@ -73,7 +72,7 @@ const userSchema = new Schema(
             select: false,
         },
 
-        // ================== PROFILE IMAGE ==================
+        // Profile image
         avatar: {
             url: {
                 type: String,
@@ -89,7 +88,7 @@ const userSchema = new Schema(
             },
         },
 
-        // ================== ACCOUNT ACTIVITY ==================
+        // Account activity
         lastLoginAt: {
             type: Date,
             default: null,
@@ -99,7 +98,7 @@ const userSchema = new Schema(
         timestamps: true,
         optimisticConcurrency: true,
 
-        // ================== SAFE JSON RESPONSE ==================
+        // Safe json response
         toJSON: {
             transform: function (doc, result) {
                 delete result.passwordHash;
@@ -117,8 +116,8 @@ const userSchema = new Schema(
     }
 );
 
-// ================== MODEL ==================
+// Model
 const User = mongoose.model("User", userSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = User;

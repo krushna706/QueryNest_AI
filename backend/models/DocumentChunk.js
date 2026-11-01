@@ -1,19 +1,18 @@
-
 const mongoose = require("mongoose");
 const { EMBEDDING_CONFIG } = require("../config/aiProviders");
 
 const { Schema } = mongoose;
 
-// ================== CHUNKING CONFIGURATION ==================
+// Chunking configuration
 const MAX_CHUNK_TOKENS = 900;
 const CHUNK_OVERLAP_TOKENS = 150;
 const MAX_CHUNK_CHARACTERS = 8000;
 const VECTOR_INDEX_NAME = "document_chunks_vector_index";
 
-// ================== DOCUMENT CHUNK SCHEMA ==================
+// Document chunk schema
 const documentChunkSchema = new Schema(
     {
-        // ================== OWNERSHIP ==================
+        // Ownership
         userId: {
             type: Schema.Types.ObjectId,
             ref: "User",
@@ -35,7 +34,7 @@ const documentChunkSchema = new Schema(
             immutable: true,
         },
 
-        // ================== CHUNK DETAILS ==================
+        // Chunk details
         fileType: {
             type: String,
             enum: ["pdf", "docx"],
@@ -72,7 +71,7 @@ const documentChunkSchema = new Schema(
             },
         },
 
-        // ================== SOURCE REFERENCES ==================
+        // Source references
         // PDF chunks stay within one page for accurate citations.
         pageNumber: {
             type: Number,
@@ -121,7 +120,7 @@ const documentChunkSchema = new Schema(
             },
         },
 
-        // ================== VECTOR EMBEDDING ==================
+        // Vector embedding
         embeddingModel: {
             type: String,
             required: true,
@@ -153,51 +152,26 @@ const documentChunkSchema = new Schema(
     }
 );
 
-// ================== SOURCE VALIDATION ==================
+// Source validation
 documentChunkSchema.pre("validate", function () {
     if (this.fileType === "docx" && this.pageNumber != null) {
-        this.invalidate(
-            "pageNumber",
-            "DOCX chunks cannot use PDF page numbers."
-        );
+        this.invalidate("pageNumber", "DOCX chunks cannot use PDF page numbers.");
     }
 
-    if (
-        this.fileType === "pdf" &&
-        (
-            this.paragraphStart != null ||
-            this.paragraphEnd != null
-        )
-    ) {
-        this.invalidate(
-            "paragraphStart",
-            "PDF chunks must use page references."
-        );
+    if (this.fileType === "pdf" && (this.paragraphStart != null || this.paragraphEnd != null)) {
+        this.invalidate("paragraphStart", "PDF chunks must use page references.");
     }
 
-    if (
-        (this.paragraphStart == null) !==
-        (this.paragraphEnd == null)
-    ) {
-        this.invalidate(
-            "paragraphEnd",
-            "Both paragraph boundaries are required together."
-        );
+    if ((this.paragraphStart == null) !== (this.paragraphEnd == null)) {
+        this.invalidate("paragraphEnd", "Both paragraph boundaries are required together.");
     }
 
-    if (
-        this.paragraphStart != null &&
-        this.paragraphEnd != null &&
-        this.paragraphEnd < this.paragraphStart
-    ) {
-        this.invalidate(
-            "paragraphEnd",
-            "Paragraph end cannot precede paragraph start."
-        );
+    if (this.paragraphStart != null && this.paragraphEnd != null && this.paragraphEnd < this.paragraphStart) {
+        this.invalidate("paragraphEnd", "Paragraph end cannot precede paragraph start.");
     }
 });
 
-// ================== DATABASE INDEXES ==================
+// Database indexes
 documentChunkSchema.index(
     {
         userId: 1,
@@ -214,7 +188,7 @@ documentChunkSchema.index({
     documentId: 1,
 });
 
-// ================== ATLAS VECTOR SEARCH INDEX ==================
+// Atlas vector search index
 // Create once in Atlas during RAG setup.
 documentChunkSchema.searchIndex({
     name: VECTOR_INDEX_NAME,
@@ -243,21 +217,17 @@ documentChunkSchema.searchIndex({
     },
 });
 
-// ================== REUSABLE CONFIGURATION ==================
+// Reusable configuration
 documentChunkSchema.statics.CHUNKING_CONFIG = Object.freeze({
     maxTokens: MAX_CHUNK_TOKENS,
     overlapTokens: CHUNK_OVERLAP_TOKENS,
     maxCharacters: MAX_CHUNK_CHARACTERS,
 });
 
-documentChunkSchema.statics.VECTOR_INDEX_NAME =
-    VECTOR_INDEX_NAME;
+documentChunkSchema.statics.VECTOR_INDEX_NAME = VECTOR_INDEX_NAME;
 
-// ================== MODEL ==================
-const DocumentChunk = mongoose.model(
-    "DocumentChunk",
-    documentChunkSchema
-);
+// Model
+const DocumentChunk = mongoose.model("DocumentChunk", documentChunkSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = DocumentChunk;

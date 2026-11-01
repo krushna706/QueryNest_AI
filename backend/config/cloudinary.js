@@ -1,23 +1,16 @@
-
 const { v2: cloudinary } = require("cloudinary");
 
-// ================== ENVIRONMENT VALIDATION ==================
-const requiredVariables = ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"];
+function configureCloudinary() {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+    const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+    const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
-for (const variable of requiredVariables) {
-    if (!process.env[variable]?.trim()) {
-        throw new Error(`${variable} is missing in environment configuration.`);
+    if (!cloudName || !apiKey || !apiSecret) {
+        throw new Error("Cloudinary configuration is incomplete.");
     }
+
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
+    return cloudinary;
 }
 
-// ================== CLOUDINARY CONFIGURATION ==================
-// Credentials stay on the backend and are loaded from environment variables.
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME.trim(),
-    api_key: process.env.CLOUDINARY_API_KEY.trim(),
-    api_secret: process.env.CLOUDINARY_API_SECRET.trim(),
-    secure: true,
-});
-
-// ================== EXPORT ==================
-module.exports = cloudinary;
+module.exports = { cloudinary, configureCloudinary };

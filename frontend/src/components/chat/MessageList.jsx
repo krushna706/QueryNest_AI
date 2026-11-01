@@ -1,3 +1,4 @@
+import { formatMessageTime } from "../../utils/formatDate";
 import { memo, useEffect, useMemo, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
@@ -6,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import CodeBlock from "./CodeBlock";
 import { getDocuments } from "../../services/documentService";
 
-// ================== MESSAGE STATUS ==================
+// Message status
 const MESSAGE_STATUSES = {
     queued: "Preparing response...",
     streaming: "Generating response...",
@@ -16,74 +17,32 @@ const MESSAGE_STATUSES = {
     cancelled: "Generation cancelled.",
 };
 
-const RETRYABLE_STATUSES = new Set([
-    "failed",
-    "stopped",
-    "incomplete",
-]);
+const RETRYABLE_STATUSES = new Set(["failed", "stopped", "incomplete"]);
 
-// ================== FORMAT MESSAGE TIME ==================
-function formatMessageTime(date) {
-    if (!date) return "";
-
-    const value = new Date(date);
-
-    if (Number.isNaN(value.getTime())) {
-        return "";
-    }
-
-    return value.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-}
-
-// ================== MARKDOWN COMPONENTS ==================
+// Markdown components
 const markdownComponents = {
+    h1: ({ node, ...props }) => <h2 {...props} className="qn-markdown-heading-lg" />,
 
-    h1: ({ node, ...props }) => (
-        <h2 {...props} className="qn-markdown-heading-lg" />
-    ),
+    h2: ({ node, ...props }) => <h3 {...props} className="qn-markdown-heading-md" />,
 
-    h2: ({ node, ...props }) => (
-        <h3 {...props} className="qn-markdown-heading-md" />
-    ),
+    h3: ({ node, ...props }) => <h4 {...props} className="qn-markdown-heading-sm" />,
 
-    h3: ({ node, ...props }) => (
-        <h4 {...props} className="qn-markdown-heading-sm" />
-    ),
+    p: ({ node, ...props }) => <p {...props} className="qn-markdown-paragraph" />,
 
-    p: ({ node, ...props }) => (
-        <p {...props} className="qn-markdown-paragraph" />
-    ),
+    ul: ({ node, ...props }) => <ul {...props} className="qn-markdown-ul" />,
 
-    ul: ({ node, ...props }) => (
-        <ul {...props} className="qn-markdown-ul" />
-    ),
+    ol: ({ node, ...props }) => <ol {...props} className="qn-markdown-ol" />,
 
-    ol: ({ node, ...props }) => (
-        <ol {...props} className="qn-markdown-ol" />
-    ),
-
-    li: ({ node, ...props }) => (
-        <li {...props} className="qn-markdown-list-item" />
-    ),
+    li: ({ node, ...props }) => <li {...props} className="qn-markdown-list-item" />,
 
     code: ({ node, children, className, ...props }) => (
-        <code
-            {...props}
-            className={[className, "qn-markdown-inline-code"].filter(Boolean).join(" ")}
-        >
+        <code {...props} className={[className, "qn-markdown-inline-code"].filter(Boolean).join(" ")}>
             {children}
         </code>
     ),
 
     pre: ({ node, children }) => {
-        const codeNode = node?.children?.find(
-            (child) =>
-                child.type === "element" &&
-                child.tagName === "code"
-        );
+        const codeNode = node?.children?.find((child) => child.type === "element" && child.tagName === "code");
 
         if (!codeNode) {
             return <pre>{children}</pre>;
@@ -91,76 +50,41 @@ const markdownComponents = {
 
         const rawClass = codeNode.properties?.className;
 
-        const className = Array.isArray(rawClass)
-            ? rawClass.join(" ")
-            : String(rawClass || "");
+        const className = Array.isArray(rawClass) ? rawClass.join(" ") : String(rawClass || "");
 
-        const language =
-            className.match(/language-([a-z0-9+#.-]+)/i)?.[1] ||
-            "text";
+        const language = className.match(/language-([a-z0-9+#.-]+)/i)?.[1] || "text";
 
-        const codeText = (codeNode.children || [])
-            .map((child) =>
-                child.type === "text" ? child.value : ""
-            )
-            .join("");
+        const codeText = (codeNode.children || []).map((child) => (child.type === "text" ? child.value : "")).join("");
 
-        return (
-            <CodeBlock language={language} code={codeText} />
-        );
+        return <CodeBlock language={language} code={codeText} />;
     },
 
-    blockquote: ({ node, ...props }) => (
-        <blockquote {...props} className="qn-markdown-quote" />
-    ),
+    blockquote: ({ node, ...props }) => <blockquote {...props} className="qn-markdown-quote" />,
 
     table: ({ node, ...props }) => (
         <div className="qn-markdown-table-scroll">
-            <table className="qn-markdown-table"
-                {...props}
-            />
+            <table className="qn-markdown-table" {...props} />
         </div>
     ),
 
-    th: ({ node, ...props }) => (
-        <th {...props} className="qn-markdown-th" />
-    ),
+    th: ({ node, ...props }) => <th {...props} className="qn-markdown-th" />,
 
-    td: ({ node, ...props }) => (
-        <td {...props} className="qn-markdown-td" />
-    ),
+    td: ({ node, ...props }) => <td {...props} className="qn-markdown-td" />,
 
     a: ({ node, href, children, ...props }) => (
-        <a className="qn-markdown-link"
-            {...props}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-        >
+        <a className="qn-markdown-link" {...props} href={href} target="_blank" rel="noopener noreferrer nofollow">
             {children}
         </a>
     ),
 
-    hr: () => (
-        <hr className="qn-markdown-rule" />
-    ),
+    hr: () => <hr className="qn-markdown-rule" />,
 
-    img: ({ alt }) => (
-        <span>
-            {alt ? `[Image: ${alt}]` : "[Image]"}
-        </span>
-    ),
+    img: ({ alt }) => <span>{alt ? `[Image: ${alt}]` : "[Image]"}</span>,
 };
 
-// ================== DOCUMENT ATTACHMENTS ==================
-function MessageAttachments({
-    attachmentIds,
-    documentMap,
-}) {
-    if (
-        !Array.isArray(attachmentIds) ||
-        attachmentIds.length === 0
-    ) {
+// Document attachments
+function MessageAttachments({ attachmentIds, documentMap }) {
+    if (!Array.isArray(attachmentIds) || attachmentIds.length === 0) {
         return null;
     }
 
@@ -170,36 +94,24 @@ function MessageAttachments({
                 const id = String(documentId);
                 const document = documentMap[id];
 
-                const filename =
-                    document?.originalName ||
-                    "Attached document";
+                const filename = document?.originalName || "Attached document";
 
-                const fileType =
-                    document?.fileType ||
-                    (
-                        filename.toLowerCase().endsWith(".pdf")
-                            ? "pdf"
-                            : "docx"
-                    );
+                const fileType = document?.fileType || (filename.toLowerCase().endsWith(".pdf") ? "pdf" : "docx");
 
                 return (
                     <div key={id} title={filename} className="d-flex align-items-center qn-message-attachment">
                         <i
-                            className={`${fileType === "pdf"
-                                    ? "fa-regular fa-file-pdf"
-                                    : "fa-regular fa-file-word"} qn-message-file-icon`}
-                            
+                            className={`${
+                                fileType === "pdf" ? "fa-regular fa-file-pdf" : "fa-regular fa-file-word"
+                            } qn-message-file-icon`}
+
                             aria-hidden="true"
                         />
                         <div className="qn-message-file-details">
-                            <strong className="qn-message-file-name">
-                                {filename}
-                            </strong>
+                            <strong className="qn-message-file-name">{filename}</strong>
 
                             <small className="qn-message-file-type">
-                                {fileType === "pdf"
-                                    ? "PDF Document"
-                                    : "Word Document"}
+                                {fileType === "pdf" ? "PDF Document" : "Word Document"}
                             </small>
                         </div>
                     </div>
@@ -209,7 +121,7 @@ function MessageAttachments({
     );
 }
 
-// ================== MESSAGE ITEM ==================
+// Message item
 const MessageItem = memo(function MessageItem({
     item,
     documentMap,
@@ -224,54 +136,28 @@ const MessageItem = memo(function MessageItem({
 }) {
     const isAssistant = item.role === "assistant";
 
-    const content =
-        typeof item.content === "string"
-            ? item.content
-            : "";
+    const content = typeof item.content === "string" ? item.content : "";
 
     const status = item.status || "completed";
 
-    const statusMessage =
-        MESSAGE_STATUSES[status] || "";
+    const statusMessage = MESSAGE_STATUSES[status] || "";
 
-    const providerName =
-        item.provider === "groq"
-            ? "Groq"
-            : item.provider === "gemini"
-                ? "Gemini"
-                : null;
+    const providerName = item.provider === "groq" ? "Groq" : item.provider === "gemini" ? "Gemini" : null;
 
-    const canRegenerate =
-        isAssistant &&
-        showActions &&
-        status === "completed" &&
-        typeof onRegenerate === "function";
+    const canRegenerate = isAssistant && showActions && status === "completed" && typeof onRegenerate === "function";
 
-    const canRetry =
-        isAssistant &&
-        showActions &&
-        RETRYABLE_STATUSES.has(status) &&
-        typeof onRetry === "function";
+    const canRetry = isAssistant && showActions && RETRYABLE_STATUSES.has(status) && typeof onRetry === "function";
 
-    const hasActions =
-        canRegenerate ||
-        canRetry ||
-        (isAssistant && versionCount > 1);
+    const hasActions = canRegenerate || canRetry || (isAssistant && versionCount > 1);
 
     return (
         <article
             className={`conversation-message conversation-message-${item.role}${isAssistant ? " qn-message-assistant-box" : ""}`}
         >
             <div className="conversation-message-heading">
-                <span>
-                    {isAssistant
-                        ? "QueryNest AI"
-                        : "You"}
-                </span>
+                <span>{isAssistant ? "QueryNest AI" : "You"}</span>
 
-                <time dateTime={item.createdAt || undefined}>
-                    {formatMessageTime(item.createdAt)}
-                </time>
+                <time dateTime={item.createdAt || undefined}>{formatMessageTime(item.createdAt)}</time>
             </div>
             <div className="conversation-message-content qn-message-content">
                 {isAssistant ? (
@@ -281,17 +167,15 @@ const MessageItem = memo(function MessageItem({
                                 {content}
                             </ReactMarkdown>
                         </div>
+                    ) : ["queued", "streaming"].includes(status) ? (
+                        "Thinking..."
                     ) : (
-                        ["queued", "streaming"].includes(status)
-                            ? "Thinking..."
-                            : ""
+                        ""
                     )
                 ) : (
                     <>
                         <MessageAttachments attachmentIds={item.attachmentIds} documentMap={documentMap} />
-                        <div className="qn-message-plain-text">
-                            {content}
-                        </div>
+                        <div className="qn-message-plain-text">{content}</div>
                     </>
                 )}
             </div>
@@ -302,44 +186,42 @@ const MessageItem = memo(function MessageItem({
                     {item.model ? ` · ${item.model}` : ""}
                 </span>
             )}
-            {isAssistant &&
-                status !== "completed" &&
-                statusMessage && (
-                    <span
-                        className={ ["queued", "streaming"].includes(status) ? "conversation-message-error qn-message-status-pending" : "conversation-message-error" }
-                    >
-                        {statusMessage}
-                    </span>
-                )}
+            {isAssistant && status !== "completed" && statusMessage && (
+                <span
+                    className={
+                        ["queued", "streaming"].includes(status)
+                            ? "conversation-message-error qn-message-status-pending"
+                            : "conversation-message-error"
+                    }
+                >
+                    {statusMessage}
+                </span>
+            )}
             {hasActions && (
                 <div className="qn-message-actions">
                     <div className="qn-message-action-main">
                         {(canRegenerate || canRetry) && (
-                            <button className="qn-message-action-button"
+                            <button
+                                className="qn-message-action-button"
                                 type="button"
                                 disabled={actionsDisabled}
-                                onClick={
-                                    canRegenerate
-                                        ? onRegenerate
-                                        : onRetry
-                                }
-                                title={
-                                    canRegenerate
-                                        ? "Regenerate response"
-                                        : "Retry response"
-                                }
+                                onClick={canRegenerate ? onRegenerate : onRetry}
+                                title={canRegenerate ? "Regenerate response" : "Retry response"}
                             >
                                 <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
 
-                                {canRegenerate
-                                    ? "Regenerate"
-                                    : "Retry"}
+                                {canRegenerate ? "Regenerate" : "Retry"}
                             </button>
                         )}
                     </div>
                     {isAssistant && versionCount > 1 && (
-                        <div className="chat-response-versions qn-message-versions" role="group" aria-label="AI response versions">
-                            <button className="qn-message-version-button-prev"
+                        <div
+                            className="chat-response-versions qn-message-versions"
+                            role="group"
+                            aria-label="AI response versions"
+                        >
+                            <button
+                                className="qn-message-version-button-prev"
                                 type="button"
                                 onClick={onPrevious}
                                 disabled={versionIndex === 0}
@@ -351,12 +233,11 @@ const MessageItem = memo(function MessageItem({
                             <span className="qn-message-version-label" aria-live="polite">
                                 {versionIndex + 1} / {versionCount}
                             </span>
-                            <button className="qn-message-version-button-next"
+                            <button
+                                className="qn-message-version-button-next"
                                 type="button"
                                 onClick={onNext}
-                                disabled={
-                                    versionIndex === versionCount - 1
-                                }
+                                disabled={versionIndex === versionCount - 1}
                                 aria-label="Next AI response version"
                                 title="Next response"
                             >
@@ -370,15 +251,12 @@ const MessageItem = memo(function MessageItem({
     );
 });
 
-// ================== GROUP RESPONSE VERSIONS ==================
+// Group response versions
 function groupMessageVersions(messages) {
     const versionsByReply = new Map();
 
     for (const item of messages) {
-        if (
-            item.role !== "assistant" ||
-            !item.replyToMessageId
-        ) {
+        if (item.role !== "assistant" || !item.replyToMessageId) {
             continue;
         }
 
@@ -395,10 +273,7 @@ function groupMessageVersions(messages) {
     const displayItems = [];
 
     for (const item of messages) {
-        if (
-            item.role === "assistant" &&
-            item.replyToMessageId
-        ) {
+        if (item.role === "assistant" && item.replyToMessageId) {
             const replyId = String(item.replyToMessageId);
 
             if (renderedReplies.has(replyId)) {
@@ -428,7 +303,7 @@ function groupMessageVersions(messages) {
     return displayItems;
 }
 
-// ================== MESSAGE LIST ==================
+// Message list
 function MessageList({
     messages = [],
     hasMore = false,
@@ -442,18 +317,11 @@ function MessageList({
 
     const [documentMap, setDocumentMap] = useState({});
 
-    const conversationId = messages.find(
-        (item) => item?.conversationId
-    )?.conversationId;
+    const conversationId = messages.find((item) => item?.conversationId)?.conversationId;
 
     const attachmentKey = messages
         .filter((item) => item?.role === "user")
-        .flatMap(
-            (item) =>
-                Array.isArray(item.attachmentIds)
-                    ? item.attachmentIds.map(String)
-                    : []
-        )
+        .flatMap((item) => (Array.isArray(item.attachmentIds) ? item.attachmentIds.map(String) : []))
         .join(",");
 
     useEffect(() => {
@@ -471,30 +339,21 @@ function MessageList({
 
         async function loadDocumentNames() {
             try {
-                const response = await getDocuments(
-                    String(conversationId),
-                    {
-                        signal: controller.signal,
-                    }
-                );
+                const response = await getDocuments(String(conversationId), {
+                    signal: controller.signal,
+                });
 
                 if (!active) return;
 
-                const documents = Array.isArray(
-                    response?.documents
-                )
-                    ? response.documents
-                    : [];
+                const documents = Array.isArray(response?.documents) ? response.documents : [];
 
                 const lookup = {};
 
                 for (const document of documents) {
                     if (document?._id) {
                         lookup[String(document._id)] = {
-                            originalName:
-                                document.originalName,
-                            fileType:
-                                document.fileType,
+                            originalName: document.originalName,
+                            fileType: document.fileType,
                         };
                     }
                 }
@@ -514,22 +373,12 @@ function MessageList({
         };
     }, [conversationId, attachmentKey]);
 
-    const displayItems = useMemo(
-        () => groupMessageVersions(messages),
-        [messages]
-    );
+    const displayItems = useMemo(() => groupMessageVersions(messages), [messages]);
 
-    const lastUserMessageId = [...messages]
-        .reverse()
-        .find((item) => item.role === "user")
-        ?._id;
+    const lastUserMessageId = [...messages].reverse().find((item) => item.role === "user")?._id;
 
     function selectVersion(replyId, versions, index) {
-        if (
-            !replyId ||
-            index < 0 ||
-            index >= versions.length
-        ) {
+        if (!replyId || index < 0 || index >= versions.length) {
             return;
         }
 
@@ -546,10 +395,12 @@ function MessageList({
         <div className="conversation-message-list">
             {hasMore && (
                 <div className="conversation-load-more">
-                    <button type="button" onClick={onLoadMore} disabled={ loadingMore || typeof onLoadMore !== "function" }>
-                        {loadingMore
-                            ? "Loading..."
-                            : "Load Earlier Messages"}
+                    <button
+                        type="button"
+                        onClick={onLoadMore}
+                        disabled={loadingMore || typeof onLoadMore !== "function"}
+                    >
+                        {loadingMore ? "Loading..." : "Load Earlier Messages"}
                     </button>
                 </div>
             )}
@@ -565,29 +416,20 @@ function MessageList({
             {displayItems.map((group) => {
                 const { replyId, versions } = group;
 
-                const savedSelection = replyId
-                    ? selectedVersions[replyId]
-                    : null;
+                const savedSelection = replyId ? selectedVersions[replyId] : null;
 
                 const savedIndex =
                     savedSelection?.versionCount === versions.length
-                        ? versions.findIndex(
-                            (item) =>
-                                String(item._id) ===
-                                String(savedSelection.messageId)
-                        )
+                        ? versions.findIndex((item) => String(item._id) === String(savedSelection.messageId))
                         : -1;
 
-                const versionIndex = savedIndex >= 0
-                    ? savedIndex
-                    : versions.length - 1;
+                const versionIndex = savedIndex >= 0 ? savedIndex : versions.length - 1;
 
                 const currentMessage = versions[versionIndex];
 
                 const showActions =
                     Boolean(replyId) &&
-                    String(replyId) ===
-                        String(lastUserMessageId) &&
+                    String(replyId) === String(lastUserMessageId) &&
                     versionIndex === versions.length - 1;
 
                 return (
@@ -599,30 +441,10 @@ function MessageList({
                         versionCount={versions.length}
                         showActions={showActions}
                         actionsDisabled={actionsDisabled}
-                        onRegenerate={
-                            showActions && onRegenerate
-                                ? () => onRegenerate(replyId)
-                                : undefined
-                        }
-                        onRetry={
-                            showActions && onRetry
-                                ? () => onRetry(replyId)
-                                : undefined
-                        }
-                        onPrevious={() =>
-                            selectVersion(
-                                replyId,
-                                versions,
-                                versionIndex - 1
-                            )
-                        }
-                        onNext={() =>
-                            selectVersion(
-                                replyId,
-                                versions,
-                                versionIndex + 1
-                            )
-                        }
+                        onRegenerate={showActions && onRegenerate ? () => onRegenerate(replyId) : undefined}
+                        onRetry={showActions && onRetry ? () => onRetry(replyId) : undefined}
+                        onPrevious={() => selectVersion(replyId, versions, versionIndex - 1)}
+                        onNext={() => selectVersion(replyId, versions, versionIndex + 1)}
                     />
                 );
             })}
@@ -630,5 +452,5 @@ function MessageList({
     );
 }
 
-// ================== EXPORT ==================
+// Export
 export default MessageList;

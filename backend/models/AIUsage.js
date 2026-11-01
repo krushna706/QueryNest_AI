@@ -1,20 +1,11 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== USAGE CONSTANTS ==================
+// Usage constants
 const AI_PROVIDERS = ["groq", "gemini"];
 
-const ATTEMPT_STATUSES = [
-    "reserved",
-    "streaming",
-    "completed",
-    "stopped",
-    "incomplete",
-    "failed",
-    "cancelled",
-];
+const ATTEMPT_STATUSES = ["reserved", "streaming", "completed", "stopped", "incomplete", "failed", "cancelled"];
 
 const USAGE_METRICS = [
     "requestsPerMinute",
@@ -24,17 +15,15 @@ const USAGE_METRICS = [
     "tokensPerDay",
 ];
 
-// ================== NON-NEGATIVE INTEGER ==================
-const isValidCount = (value) =>
-    value == null ||
-    (Number.isSafeInteger(value) && value >= 0);
+// Non-negative integer
+const isValidCount = (value) => value == null || (Number.isSafeInteger(value) && value >= 0);
 
-// ================== AI REQUEST ATTEMPT ==================
+// Ai request attempt
 // One record per provider request, including fallback and embedding calls.
 // No prompt text, document text or conversation content is stored.
 const aiUsageSchema = new Schema(
     {
-        // ================== REQUEST IDENTITY ==================
+        // Request identity
         attemptKey: {
             type: String,
             required: true,
@@ -51,7 +40,7 @@ const aiUsageSchema = new Schema(
             immutable: true,
         },
 
-        // ================== PROVIDER DETAILS ==================
+        // Provider details
         provider: {
             type: String,
             enum: AI_PROVIDERS,
@@ -82,7 +71,7 @@ const aiUsageSchema = new Schema(
             default: null,
         },
 
-        // ================== REQUEST STATUS ==================
+        // Request status
         status: {
             type: String,
             enum: ATTEMPT_STATUSES,
@@ -90,7 +79,7 @@ const aiUsageSchema = new Schema(
             required: true,
         },
 
-        // ================== RESERVED TOKEN BUDGET ==================
+        // Reserved token budget
         estimatedInputTokens: {
             type: Number,
             required: true,
@@ -112,7 +101,7 @@ const aiUsageSchema = new Schema(
             validate: isValidCount,
         },
 
-        // ================== ACTUAL TOKEN USAGE ==================
+        // Actual token usage
         actualInputTokens: {
             type: Number,
             default: null,
@@ -140,7 +129,7 @@ const aiUsageSchema = new Schema(
             default: "unavailable",
         },
 
-        // ================== RECOVERY METADATA ==================
+        // Recovery metadata
         leaseExpiresAt: {
             type: Date,
             default: null,
@@ -168,12 +157,12 @@ const aiUsageSchema = new Schema(
     }
 );
 
-// ================== ATTEMPT INDEXES ==================
+// Attempt indexes
 aiUsageSchema.index({ userId: 1, createdAt: -1 });
 aiUsageSchema.index({ provider: 1, createdAt: -1 });
 aiUsageSchema.index({ status: 1, leaseExpiresAt: 1 });
 
-// ================== QUOTA COUNTER ==================
+// Quota counter
 // One counter per scope, metric and time window.
 // Atomic reservation and reconciliation will be implemented
 // in the usage service, not in this schema.
@@ -239,7 +228,7 @@ const aiUsageCounterSchema = new Schema(
     }
 );
 
-// ================== COUNTER INDEXES ==================
+// Counter indexes
 aiUsageCounterSchema.index(
     {
         scope: 1,
@@ -252,24 +241,15 @@ aiUsageCounterSchema.index(
     }
 );
 
-// ================== COUNTER EXPIRATION ==================
-aiUsageCounterSchema.index(
-    { expiresAt: 1 },
-    { expireAfterSeconds: 0 }
-);
+// Counter expiration
+aiUsageCounterSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// ================== MODELS ==================
-const AIUsage = mongoose.model(
-    "AIUsage",
-    aiUsageSchema
-);
+// Models
+const AIUsage = mongoose.model("AIUsage", aiUsageSchema);
 
-const AIUsageCounter = mongoose.model(
-    "AIUsageCounter",
-    aiUsageCounterSchema
-);
+const AIUsageCounter = mongoose.model("AIUsageCounter", aiUsageCounterSchema);
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     AIUsage,
     AIUsageCounter,

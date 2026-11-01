@@ -1,4 +1,3 @@
-
 const jwt = require("jsonwebtoken");
 const { createHash } = require("node:crypto");
 
@@ -6,7 +5,7 @@ const User = require("../models/User");
 const AuthSession = require("../models/AuthSession");
 const ExpressError = require("../utils/ExpressError");
 
-// ================== AUTHENTICATION MIDDLEWARE ==================
+// Authentication middleware
 async function authMiddleware(req, res, next) {
     try {
         const token = req.cookies?.token;
@@ -21,7 +20,6 @@ async function authMiddleware(req, res, next) {
             throw new Error("Invalid JWT_SECRET configuration.");
         }
 
-        // ================== VERIFY JWT ==================
         let decoded;
 
         try {
@@ -36,15 +34,12 @@ async function authMiddleware(req, res, next) {
                 error.name === "JsonWebTokenError" ||
                 error.name === "NotBeforeError"
             ) {
-                return next(
-                    new ExpressError(401, "Your session is invalid or expired. Please login again.")
-                );
+                return next(new ExpressError(401, "Your session is invalid or expired. Please login again."));
             }
 
             throw error;
         }
 
-        // ================== VALIDATE TOKEN DATA ==================
         if (
             !decoded ||
             typeof decoded !== "object" ||
@@ -56,41 +51,24 @@ async function authMiddleware(req, res, next) {
             decoded.tokenVersion < 0 ||
             !Number.isInteger(decoded.exp)
         ) {
-            return next(
-                new ExpressError(401, "Your session is invalid. Please login again.")
-            );
+            return next(new ExpressError(401, "Your session is invalid. Please login again."));
         }
 
-        // ================== VERIFY USER ==================
-        const user = await User.findById(decoded.sub)
-            .select("_id role status +tokenVersion")
-            .lean();
+        const user = await User.findById(decoded.sub).select("_id role status +tokenVersion").lean();
 
         if (!user) {
-            return next(
-                new ExpressError(401, "Your session is invalid. Please login again.")
-            );
+            return next(new ExpressError(401, "Your session is invalid. Please login again."));
         }
 
         if (user.status !== "Active") {
-            return next(
-                new ExpressError(403, "Your account is inactive.")
-            );
+            return next(new ExpressError(403, "Your account is inactive."));
         }
 
-        if (
-            user.role !== "user" ||
-            user.tokenVersion !== decoded.tokenVersion
-        ) {
-            return next(
-                new ExpressError(401, "Your session has ended. Please login again.")
-            );
+        if (user.role !== "user" || user.tokenVersion !== decoded.tokenVersion) {
+            return next(new ExpressError(401, "Your session has ended. Please login again."));
         }
 
-        // ================== VERIFY ACTIVE SESSION ==================
-        const tokenHash = createHash("sha256")
-            .update(decoded.jti)
-            .digest("hex");
+        const tokenHash = createHash("sha256").update(decoded.jti).digest("hex");
 
         const session = await AuthSession.findOne({
             userId: user._id,
@@ -102,12 +80,9 @@ async function authMiddleware(req, res, next) {
             .lean();
 
         if (!session) {
-            return next(
-                new ExpressError(401, "Your session has ended. Please login again.")
-            );
+            return next(new ExpressError(401, "Your session has ended. Please login again."));
         }
 
-        // ================== AUTHENTICATED USER ==================
         req.user = {
             _id: user._id,
             role: user.role,
@@ -121,5 +96,5 @@ async function authMiddleware(req, res, next) {
     }
 }
 
-// ================== EXPORT ==================
+// Export
 module.exports = authMiddleware;

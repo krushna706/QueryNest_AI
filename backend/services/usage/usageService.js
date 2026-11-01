@@ -1,23 +1,16 @@
-
 const mongoose = require("mongoose");
 
 const { AIUsage, AIUsageCounter } = require("../../models/AIUsage");
 const { AI_PROVIDERS } = require("../../config/aiProviders");
-const {
-    APP_USAGE_LIMITS,
-    getProviderUsageLimits,
-} = require("../../config/usageLimits");
-const {
-    checkTokenBudget,
-    getProviderBudgetSnapshot,
-} = require("./tokenBudget");
+const { APP_USAGE_LIMITS, getProviderUsageLimits } = require("../../config/usageLimits");
+const { checkTokenBudget, getProviderBudgetSnapshot } = require("./tokenBudget");
 
-// ================== USAGE SETTINGS ==================
+// Usage settings
 const TRANSACTION_RETRIES = 3;
 const LEASE_DURATION_MS = 5 * 60 * 1000;
 const COUNTER_RETENTION_MS = 48 * 60 * 60 * 1000;
 
-// ================== QUOTA ERROR ==================
+// Quota error
 class QuotaError extends Error {
     constructor(code) {
         super(code);
@@ -26,7 +19,7 @@ class QuotaError extends Error {
     }
 }
 
-// ================== TIME WINDOWS ==================
+// Time windows
 function getWindow(metric, date) {
     const start = new Date(date);
 
@@ -38,89 +31,31 @@ function getWindow(metric, date) {
         throw new Error(`Unsupported usage metric: ${metric}.`);
     }
 
-    const duration = metric.endsWith("PerMinute")
-        ? 60 * 1000
-        : 24 * 60 * 60 * 1000;
+    const duration = metric.endsWith("PerMinute") ? 60 * 1000 : 24 * 60 * 60 * 1000;
 
     const windowEnd = new Date(start.getTime() + duration);
 
     return {
         windowStart: start,
         windowEnd,
-        expiresAt: new Date(
-            windowEnd.getTime() + COUNTER_RETENTION_MS
-        ),
+        expiresAt: new Date(windowEnd.getTime() + COUNTER_RETENTION_MS),
     };
 }
 
-// ================== BUILD COUNTER ITEMS ==================
-function buildCounterItems({
-    userId,
-    provider,
-    estimatedInputTokens,
-    maxOutputTokens,
-    date,
-}) {
+// Build counter items
+function buildCounterItems({ userId, provider, estimatedInputTokens, maxOutputTokens, date }) {
     const totalTokens = estimatedInputTokens + maxOutputTokens;
     const providerLimits = getProviderUsageLimits(provider);
 
     const entries = [
-        [
-            "user",
-            String(userId),
-            "requestsPerMinute",
-            1,
-            APP_USAGE_LIMITS.requestsPerUserPerMinute,
-        ],
-        [
-            "user",
-            String(userId),
-            "requestsPerDay",
-            1,
-            APP_USAGE_LIMITS.requestsPerUserPerDay,
-        ],
-        [
-            "user",
-            String(userId),
-            "tokensPerDay",
-            totalTokens,
-            APP_USAGE_LIMITS.tokensPerUserPerDay,
-        ],
-        [
-            "provider",
-            provider,
-            "requestsPerMinute",
-            1,
-            providerLimits.requestsPerMinute,
-        ],
-        [
-            "provider",
-            provider,
-            "requestsPerDay",
-            1,
-            providerLimits.requestsPerDay,
-        ],
-        [
-            "provider",
-            provider,
-            "tokensPerMinute",
-            totalTokens,
-            providerLimits.tokensPerMinute,
-        ],
-        [
-            "provider",
-            provider,
-            "inputTokensPerMinute",
-            estimatedInputTokens,
-            providerLimits.inputTokensPerMinute,
-        ],
-        [
-            "provider",
-            provider,
-            "tokensPerDay",
-            totalTokens,
-            providerLimits.tokensPerDay,
-        ],
+        ["user", String(userId), "requestsPerMinute", 1, APP_USAGE_LIMITS.requestsPerUserPerMinute],
+        ["user", String(userId), "requestsPerDay", 1, APP_USAGE_LIMITS.requestsPerUserPerDay],
+        ["user", String(userId), "tokensPerDay", totalTokens, APP_USAGE_LIMITS.tokensPerUserPerDay],
+        ["provider", provider, "requestsPerMinute", 1, providerLimits.requestsPerMinute],
+        ["provider", provider, "requestsPerDay", 1, providerLimits.requestsPerDay],
+        ["provider", provider, "tokensPerMinute", totalTokens, providerLimits.tokensPerMinute],
+        ["provider", provider, "inputTokensPerMinute", estimatedInputTokens, providerLimits.inputTokensPerMinute],
+        ["provider", provider, "tokensPerDay", totalTokens, providerLimits.tokensPerDay],
     ];
 
     // Skip metrics without a configured limit.
@@ -136,7 +71,7 @@ function buildCounterItems({
         }));
 }
 
-// ================== COUNTER FILTER ==================
+// Counter filter
 function counterFilter(item) {
     return {
         scope: item.scope,
@@ -146,15 +81,13 @@ function counterFilter(item) {
     };
 }
 
-// ================== LOAD COUNTER SNAPSHOTS ==================
+// Load counter snapshots
 async function getCounterSnapshots(items, session) {
     const userUsage = {};
     const providerUsage = {};
 
     for (const item of items) {
-        const target = item.scope === "user"
-            ? userUsage
-            : providerUsage;
+        const target = item.scope === "user" ? userUsage : providerUsage;
 
         target[item.metric] = {
             used: 0,
@@ -169,9 +102,7 @@ async function getCounterSnapshots(items, session) {
         .lean();
 
     for (const counter of counters) {
-        const target = counter.scope === "user"
-            ? userUsage
-            : providerUsage;
+        const target = counter.scope === "user" ? userUsage : providerUsage;
 
         target[counter.metric] = {
             used: counter.used,
@@ -185,7 +116,7 @@ async function getCounterSnapshots(items, session) {
     };
 }
 
-// ================== RESERVE COUNTER ==================
+// Reserve counter
 async function reserveCounter(item, session) {
     const filter = counterFilter(item);
 
@@ -213,11 +144,7 @@ async function reserveCounter(item, session) {
             $expr: {
                 $lte: [
                     {
-                        $add: [
-                            { $ifNull: ["$used", 0] },
-                            { $ifNull: ["$reserved", 0] },
-                            item.amount,
-                        ],
+                        $add: [{ $ifNull: ["$used", 0] }, { $ifNull: ["$reserved", 0] }, item.amount],
                     },
                     item.limit,
                 ],
@@ -236,13 +163,8 @@ async function reserveCounter(item, session) {
     }
 }
 
-// ================== UPDATE COUNTER ==================
-async function updateCounter(
-    item,
-    reservedDelta,
-    usedDelta,
-    session
-) {
+// Update counter
+async function updateCounter(item, reservedDelta, usedDelta, session) {
     if (reservedDelta === 0 && usedDelta === 0) {
         return;
     }
@@ -258,37 +180,26 @@ async function updateCounter(
         update.$inc.used = usedDelta;
     }
 
-    const safeFilter = reservedDelta < 0
-        ? {
-            ...filter,
-            reserved: { $gte: -reservedDelta },
-        }
-        : filter;
+    const safeFilter =
+        reservedDelta < 0
+            ? {
+                  ...filter,
+                  reserved: { $gte: -reservedDelta },
+              }
+            : filter;
 
-    const result = await AIUsageCounter.updateOne(
-        safeFilter,
-        update,
-        { session }
-    );
+    const result = await AIUsageCounter.updateOne(safeFilter, update, { session });
 
     if (result.matchedCount !== 1) {
-        throw new Error(
-            "Usage counter reconciliation failed."
-        );
+        throw new Error("Usage counter reconciliation failed.");
     }
 }
 
-// ================== TRANSACTION RETRIES ==================
+// Transaction retries
 async function runTransaction(operation) {
-    for (
-        let attempt = 1;
-        attempt <= TRANSACTION_RETRIES;
-        attempt++
-    ) {
+    for (let attempt = 1; attempt <= TRANSACTION_RETRIES; attempt++) {
         try {
-            return await mongoose.connection.transaction(
-                operation
-            );
+            return await mongoose.connection.transaction(operation);
         } catch (error) {
             if (error instanceof QuotaError) {
                 throw error;
@@ -296,24 +207,17 @@ async function runTransaction(operation) {
 
             const retryable =
                 error?.code === 112 ||
-                error?.hasErrorLabel?.(
-                    "TransientTransactionError"
-                ) ||
-                error?.hasErrorLabel?.(
-                    "UnknownTransactionCommitResult"
-                );
+                error?.hasErrorLabel?.("TransientTransactionError") ||
+                error?.hasErrorLabel?.("UnknownTransactionCommitResult");
 
-            if (
-                !retryable ||
-                attempt === TRANSACTION_RETRIES
-            ) {
+            if (!retryable || attempt === TRANSACTION_RETRIES) {
                 throw error;
             }
         }
     }
 }
 
-// ================== CURRENT PROVIDER BUDGETS ==================
+// Current provider budgets
 // Read tracked provider counters before AI routing.
 // Final quota enforcement remains inside the reservation transaction.
 async function getCurrentProviderBudgets() {
@@ -323,7 +227,6 @@ async function getCurrentProviderBudgets() {
     const counterSnapshots = {};
     const conditions = [];
 
-    // ================== PREPARE PROVIDER METRICS ==================
     for (const provider of providerNames) {
         const limits = getProviderUsageLimits(provider);
         const providerUsage = {};
@@ -339,10 +242,7 @@ async function getCurrentProviderBudgets() {
                 continue;
             }
 
-            const { windowStart } = getWindow(
-                metric,
-                now
-            );
+            const { windowStart } = getWindow(metric, now);
 
             providerUsage[metric] = {
                 used: 0,
@@ -360,17 +260,14 @@ async function getCurrentProviderBudgets() {
         counterSnapshots[provider] = providerUsage;
     }
 
-    // ================== FETCH CURRENT COUNTERS ==================
     const counters = conditions.length
         ? await AIUsageCounter.find({
-            $or: conditions,
-        }).lean()
+              $or: conditions,
+          }).lean()
         : [];
 
-    // ================== MAP PROVIDER USAGE ==================
     for (const counter of counters) {
-        const providerUsage =
-            counterSnapshots[counter.scopeId];
+        const providerUsage = counterSnapshots[counter.scopeId];
 
         if (!providerUsage?.[counter.metric]) {
             continue;
@@ -382,43 +279,30 @@ async function getCurrentProviderBudgets() {
         };
     }
 
-    // ================== CALCULATE REMAINING QUOTAS ==================
     const budgets = {};
 
     for (const provider of providerNames) {
-        budgets[provider] = getProviderBudgetSnapshot(
-            provider,
-            counterSnapshots[provider]
-        );
+        budgets[provider] = getProviderBudgetSnapshot(provider, counterSnapshots[provider]);
     }
 
     return budgets;
 }
 
-// ================== RESERVE AI USAGE ==================
+// Reserve ai usage
 async function reserveAIUsage({
     attemptKey,
     userId,
     provider,
     task,
     estimatedInputTokens,
-    maxOutputTokens =
-        APP_USAGE_LIMITS.maxOutputTokensPerRequest,
+    maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
 } = {}) {
-    // ================== VALIDATE INPUT ==================
-    if (
-        typeof attemptKey !== "string" ||
-        !attemptKey.trim()
-    ) {
-        throw new Error(
-            "A valid AI attempt key is required."
-        );
+    if (typeof attemptKey !== "string" || !attemptKey.trim()) {
+        throw new Error("A valid AI attempt key is required.");
     }
 
     if (!mongoose.isValidObjectId(userId)) {
-        throw new Error(
-            "A valid user ID is required."
-        );
+        throw new Error("A valid user ID is required.");
     }
 
     if (!AI_PROVIDERS[provider]) {
@@ -430,16 +314,12 @@ async function reserveAIUsage({
         estimatedInputTokens < 1 ||
         !Number.isSafeInteger(maxOutputTokens) ||
         maxOutputTokens < 1 ||
-        maxOutputTokens >
-            APP_USAGE_LIMITS.maxOutputTokensPerRequest ||
-        !Number.isSafeInteger(
-            estimatedInputTokens + maxOutputTokens
-        )
+        maxOutputTokens > APP_USAGE_LIMITS.maxOutputTokensPerRequest ||
+        !Number.isSafeInteger(estimatedInputTokens + maxOutputTokens)
     ) {
         throw new Error("Invalid AI token reservation.");
     }
 
-    // ================== PREPARE COUNTERS ==================
     const now = new Date();
 
     const items = buildCounterItems({
@@ -452,7 +332,6 @@ async function reserveAIUsage({
 
     try {
         return await runTransaction(async (session) => {
-            // ================== DUPLICATE CHECK ==================
             const exists = await AIUsage.exists({
                 attemptKey,
             }).session(session);
@@ -464,11 +343,7 @@ async function reserveAIUsage({
                 };
             }
 
-            // ================== CHECK AVAILABLE QUOTA ==================
-            const snapshots = await getCounterSnapshots(
-                items,
-                session
-            );
+            const snapshots = await getCounterSnapshots(items, session);
 
             const budget = checkTokenBudget({
                 provider,
@@ -486,31 +361,28 @@ async function reserveAIUsage({
                 };
             }
 
-            // ================== RESERVE ALL COUNTERS ==================
             for (const item of items) {
                 await reserveCounter(item, session);
             }
 
-            // ================== CREATE USAGE ATTEMPT ==================
             await AIUsage.create(
-                [{
-                    attemptKey,
-                    userId,
-                    provider,
-                    model: AI_PROVIDERS[provider].model,
-                    operation: "chat",
-                    task,
-                    status: "reserved",
-                    estimatedInputTokens,
-                    reservedOutputTokens: maxOutputTokens,
-                    reservedTotalTokens:
-                        estimatedInputTokens + maxOutputTokens,
-                    usageSource: "unavailable",
-                    leaseExpiresAt: new Date(
-                        now.getTime() + LEASE_DURATION_MS
-                    ),
-                    createdAt: now,
-                }],
+                [
+                    {
+                        attemptKey,
+                        userId,
+                        provider,
+                        model: AI_PROVIDERS[provider].model,
+                        operation: "chat",
+                        task,
+                        status: "reserved",
+                        estimatedInputTokens,
+                        reservedOutputTokens: maxOutputTokens,
+                        reservedTotalTokens: estimatedInputTokens + maxOutputTokens,
+                        usageSource: "unavailable",
+                        leaseExpiresAt: new Date(now.getTime() + LEASE_DURATION_MS),
+                        createdAt: now,
+                    },
+                ],
                 { session }
             );
 
@@ -531,20 +403,18 @@ async function reserveAIUsage({
     }
 }
 
-// ================== LOAD ATTEMPT COUNTERS ==================
+// Load attempt counters
 function getAttemptItems(attempt) {
     return buildCounterItems({
         userId: attempt.userId,
         provider: attempt.provider,
-        estimatedInputTokens:
-            attempt.estimatedInputTokens,
-        maxOutputTokens:
-            attempt.reservedOutputTokens,
+        estimatedInputTokens: attempt.estimatedInputTokens,
+        maxOutputTokens: attempt.reservedOutputTokens,
         date: attempt.createdAt,
     });
 }
 
-// ================== START AI USAGE ==================
+// Start ai usage
 async function startAIUsage({ attemptKey } = {}) {
     if (!attemptKey) {
         throw new Error("AI attempt key is required.");
@@ -556,9 +426,7 @@ async function startAIUsage({ attemptKey } = {}) {
         }).session(session);
 
         if (!attempt) {
-            throw new Error(
-                "AI usage reservation not found."
-            );
+            throw new Error("AI usage reservation not found.");
         }
 
         if (attempt.status === "streaming") {
@@ -566,26 +434,17 @@ async function startAIUsage({ attemptKey } = {}) {
         }
 
         if (attempt.status !== "reserved") {
-            throw new Error(
-                "AI usage reservation cannot be started."
-            );
+            throw new Error("AI usage reservation cannot be started.");
         }
 
-        // ================== CONSUME REQUEST QUOTA ==================
         for (const item of getAttemptItems(attempt)) {
             if (!item.metric.startsWith("requests")) {
                 continue;
             }
 
-            await updateCounter(
-                item,
-                -item.amount,
-                item.amount,
-                session
-            );
+            await updateCounter(item, -item.amount, item.amount, session);
         }
 
-        // ================== UPDATE ATTEMPT ==================
         await AIUsage.updateOne(
             {
                 _id: attempt._id,
@@ -595,9 +454,7 @@ async function startAIUsage({ attemptKey } = {}) {
                 $set: {
                     status: "streaming",
                     startedAt: new Date(),
-                    leaseExpiresAt: new Date(
-                        Date.now() + LEASE_DURATION_MS
-                    ),
+                    leaseExpiresAt: new Date(Date.now() + LEASE_DURATION_MS),
                 },
             },
             { session }
@@ -607,7 +464,7 @@ async function startAIUsage({ attemptKey } = {}) {
     });
 }
 
-// ================== NORMALIZE ACTUAL USAGE ==================
+// Normalize actual usage
 function getActualUsage(attempt, usage) {
     const input = usage?.inputTokens;
     const output = usage?.outputTokens;
@@ -639,27 +496,14 @@ function getActualUsage(attempt, usage) {
     };
 }
 
-// ================== FINALIZE AI USAGE ==================
-async function finalizeAIUsage({
-    attemptKey,
-    status = "completed",
-    usage = null,
-} = {}) {
+// Finalize ai usage
+async function finalizeAIUsage({ attemptKey, status = "completed", usage = null } = {}) {
     if (!attemptKey) {
         throw new Error("AI attempt key is required.");
     }
 
-    if (
-        ![
-            "completed",
-            "stopped",
-            "incomplete",
-            "failed",
-        ].includes(status)
-    ) {
-        throw new Error(
-            "Invalid AI usage final status."
-        );
+    if (!["completed", "stopped", "incomplete", "failed"].includes(status)) {
+        throw new Error("Invalid AI usage final status.");
     }
 
     return runTransaction(async (session) => {
@@ -668,66 +512,34 @@ async function finalizeAIUsage({
         }).session(session);
 
         if (!attempt) {
-            throw new Error(
-                "AI usage attempt not found."
-            );
+            throw new Error("AI usage attempt not found.");
         }
 
-        // ================== IDEMPOTENT FINALIZATION ==================
-        if (
-            [
-                "completed",
-                "stopped",
-                "incomplete",
-                "failed",
-                "cancelled",
-            ].includes(attempt.status)
-        ) {
+        if (["completed", "stopped", "incomplete", "failed", "cancelled"].includes(attempt.status)) {
             return true;
         }
 
-        if (
-            !["reserved", "streaming"].includes(
-                attempt.status
-            )
-        ) {
-            throw new Error(
-                "Invalid AI usage state."
-            );
+        if (!["reserved", "streaming"].includes(attempt.status)) {
+            throw new Error("Invalid AI usage state.");
         }
 
         const started = attempt.status === "streaming";
         const actual = getActualUsage(attempt, usage);
 
-        // ================== RECONCILE COUNTERS ==================
         for (const item of getAttemptItems(attempt)) {
             if (item.metric.startsWith("requests")) {
                 if (!started) {
-                    await updateCounter(
-                        item,
-                        -item.amount,
-                        0,
-                        session
-                    );
+                    await updateCounter(item, -item.amount, 0, session);
                 }
 
                 continue;
             }
 
-            const actualAmount =
-                item.metric === "inputTokensPerMinute"
-                    ? actual.inputTokens
-                    : actual.totalTokens;
+            const actualAmount = item.metric === "inputTokensPerMinute" ? actual.inputTokens : actual.totalTokens;
 
-            await updateCounter(
-                item,
-                -item.amount,
-                started ? actualAmount : 0,
-                session
-            );
+            await updateCounter(item, -item.amount, started ? actualAmount : 0, session);
         }
 
-        // ================== SAVE ACTUAL USAGE ==================
         await AIUsage.updateOne(
             {
                 _id: attempt._id,
@@ -736,15 +548,10 @@ async function finalizeAIUsage({
             {
                 $set: {
                     status,
-                    actualInputTokens:
-                        started ? actual.inputTokens : 0,
-                    actualOutputTokens:
-                        started ? actual.outputTokens : 0,
-                    actualTotalTokens:
-                        started ? actual.totalTokens : 0,
-                    usageSource: started
-                        ? actual.usageSource
-                        : "unavailable",
+                    actualInputTokens: started ? actual.inputTokens : 0,
+                    actualOutputTokens: started ? actual.outputTokens : 0,
+                    actualTotalTokens: started ? actual.totalTokens : 0,
+                    usageSource: started ? actual.usageSource : "unavailable",
                     finishedAt: new Date(),
                     leaseExpiresAt: null,
                 },
@@ -756,10 +563,8 @@ async function finalizeAIUsage({
     });
 }
 
-// ================== CANCEL RESERVED AI USAGE ==================
-async function cancelReservedAIUsage({
-    attemptKey,
-} = {}) {
+// Cancel reserved ai usage
+async function cancelReservedAIUsage({ attemptKey } = {}) {
     if (!attemptKey) {
         throw new Error("AI attempt key is required.");
     }
@@ -769,10 +574,7 @@ async function cancelReservedAIUsage({
             attemptKey,
         }).session(session);
 
-        if (
-            !attempt ||
-            attempt.status === "cancelled"
-        ) {
+        if (!attempt || attempt.status === "cancelled") {
             return true;
         }
 
@@ -780,17 +582,10 @@ async function cancelReservedAIUsage({
             return false;
         }
 
-        // ================== RELEASE RESERVED QUOTA ==================
         for (const item of getAttemptItems(attempt)) {
-            await updateCounter(
-                item,
-                -item.amount,
-                0,
-                session
-            );
+            await updateCounter(item, -item.amount, 0, session);
         }
 
-        // ================== MARK CANCELLED ==================
         await AIUsage.updateOne(
             {
                 _id: attempt._id,
@@ -810,7 +605,7 @@ async function cancelReservedAIUsage({
     });
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     getCurrentProviderBudgets,
     reserveAIUsage,

@@ -1,10 +1,9 @@
-
 const Groq = require("groq-sdk");
 
 const { getAIProviderConfig } = require("../../config/aiProviders");
 const { APP_USAGE_LIMITS } = require("../../config/usageLimits");
 
-// ================== PREPARE GROQ MESSAGES ==================
+// Prepare groq messages
 function prepareGroqMessages(messages, systemInstruction) {
     if (!Array.isArray(messages) || messages.length === 0) {
         throw new Error("AI messages are required.");
@@ -37,22 +36,24 @@ function prepareGroqMessages(messages, systemInstruction) {
     return prepared;
 }
 
-// ================== NORMALIZE TOKEN USAGE ==================
+// Normalize token usage
 function normalizeGroqUsage(usage) {
     if (!usage || typeof usage !== "object") return null;
 
     const inputTokens = usage.prompt_tokens ?? usage.input_tokens;
     const outputTokens = usage.completion_tokens ?? usage.output_tokens;
 
-    const totalTokens = usage.total_tokens ??
-        (Number.isSafeInteger(inputTokens) && Number.isSafeInteger(outputTokens)
-            ? inputTokens + outputTokens
-            : null);
+    const totalTokens =
+        usage.total_tokens ??
+        (Number.isSafeInteger(inputTokens) && Number.isSafeInteger(outputTokens) ? inputTokens + outputTokens : null);
 
     if (
-        !Number.isSafeInteger(inputTokens) || inputTokens < 0 ||
-        !Number.isSafeInteger(outputTokens) || outputTokens < 0 ||
-        !Number.isSafeInteger(totalTokens) || totalTokens < 0
+        !Number.isSafeInteger(inputTokens) ||
+        inputTokens < 0 ||
+        !Number.isSafeInteger(outputTokens) ||
+        outputTokens < 0 ||
+        !Number.isSafeInteger(totalTokens) ||
+        totalTokens < 0
     ) {
         return null;
     }
@@ -65,15 +66,13 @@ function normalizeGroqUsage(usage) {
     };
 }
 
-// ================== STREAM GROQ RESPONSE ==================
+// Stream groq response
 async function* streamGroqResponse({
     messages,
     systemInstruction = "",
     maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     signal,
 } = {}) {
-
-    // ================== VALIDATE OUTPUT LIMIT ==================
     if (
         !Number.isSafeInteger(maxOutputTokens) ||
         maxOutputTokens < 1 ||
@@ -86,22 +85,16 @@ async function* streamGroqResponse({
         throw new Error("Generation stopped.");
     }
 
-    // ================== PREPARE REQUEST ==================
-    const preparedMessages = prepareGroqMessages(
-        messages,
-        systemInstruction
-    );
+    const preparedMessages = prepareGroqMessages(messages, systemInstruction);
 
     const { apiKey, model } = getAIProviderConfig("groq");
 
-    // ================== INITIALIZE GROQ ==================
     const client = new Groq({
         apiKey,
         maxRetries: 0,
         timeout: 60000,
     });
 
-    // ================== CREATE STREAM ==================
     const completion = await client.chat.completions.create(
         {
             model,
@@ -117,7 +110,6 @@ async function* streamGroqResponse({
 
     let finishReason = "unknown";
 
-    // ================== PROCESS STREAM ==================
     for await (const chunk of completion) {
         if (signal?.aborted) {
             throw new Error("Generation stopped.");
@@ -126,7 +118,6 @@ async function* streamGroqResponse({
         const choice = chunk?.choices?.[0];
         const text = choice?.delta?.content;
 
-        // ================== RESPONSE TEXT ==================
         if (typeof text === "string" && text.length > 0) {
             yield {
                 type: "delta",
@@ -134,22 +125,17 @@ async function* streamGroqResponse({
             };
         }
 
-        // ================== FINISH REASON ==================
         if (choice?.finish_reason) {
             finishReason = choice.finish_reason;
         }
 
-        // ================== TOKEN USAGE ==================
-        const usageEvent = normalizeGroqUsage(
-            chunk?.usage ?? chunk?.x_groq?.usage
-        );
+        const usageEvent = normalizeGroqUsage(chunk?.usage ?? chunk?.x_groq?.usage);
 
         if (usageEvent) {
             yield usageEvent;
         }
     }
 
-    // ================== STREAM COMPLETED ==================
     if (signal?.aborted) {
         throw new Error("Generation stopped.");
     }
@@ -160,7 +146,7 @@ async function* streamGroqResponse({
     };
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     streamGroqResponse,
 };

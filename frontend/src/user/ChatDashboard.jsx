@@ -1,3 +1,4 @@
+import { DOCUMENT_LIMITS } from "../config/appConfig";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -9,7 +10,7 @@ import { createConversation, sendMessage, generateChatRequestId } from "../servi
 
 import { uploadDocuments } from "../services/documentService";
 
-// ================== STARTER PROMPTS ==================
+// Starter prompts
 const starterPrompts = [
     {
         title: "Ask Anything",
@@ -37,20 +38,16 @@ const starterPrompts = [
     },
 ];
 
-// ================== DOCUMENT SETTINGS ==================
-const MAX_DOCUMENTS = 3;
+// Document settings
+const MAX_DOCUMENTS = DOCUMENT_LIMITS.maxFiles;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
-// ================== ERROR MESSAGE ==================
+// Error message
 function getErrorMessage(error, fallback) {
-    return (
-        error?.response?.data?.message ||
-        error?.message ||
-        fallback
-    );
+    return error?.response?.data?.message || error?.message || fallback;
 }
 
-// ================== CHAT DASHBOARD ==================
+// Chat dashboard
 function ChatDashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -77,7 +74,6 @@ function ChatDashboard() {
         requestSignIn();
     };
 
-
     const [message, setMessage] = useState("");
     const [attachments, setAttachments] = useState([]);
     const [sending, setSending] = useState(false);
@@ -88,8 +84,7 @@ function ChatDashboard() {
     const requestIdRef = useRef(null);
     const uploadControllerRef = useRef(null);
 
-    const firstName =
-        user?.name?.trim().split(/\s+/)[0] || "there";
+    const firstName = user?.name?.trim().split(/\s+/)[0] || "there";
 
     useEffect(() => {
         return () => {
@@ -125,68 +120,41 @@ function ChatDashboard() {
         uploadControllerRef.current?.abort();
     };
 
-    const openConversation = (
-        conversationId,
-        initialMessageId = null
-    ) => {
+    const openConversation = (conversationId, initialMessageId = null) => {
         navigate(`/chat/${conversationId}`, {
             replace: true,
             state: initialMessageId
                 ? {
-                    autoGenerateMessageId: initialMessageId,
-                }
+                      autoGenerateMessageId: initialMessageId,
+                  }
                 : null,
         });
     };
 
-    const createNormalChat = async (
-        content,
-        clientRequestId
-    ) => {
-        const response = await createConversation(
-            content,
-            clientRequestId
-        );
+    const createNormalChat = async (content, clientRequestId) => {
+        const response = await createConversation(content, clientRequestId);
 
         const conversationId = response?.conversation?._id;
 
-        if (
-            typeof conversationId !== "string" ||
-            !OBJECT_ID_PATTERN.test(conversationId)
-        ) {
-            throw new Error(
-                "Conversation ID was not returned correctly."
-            );
+        if (typeof conversationId !== "string" || !OBJECT_ID_PATTERN.test(conversationId)) {
+            throw new Error("Conversation ID was not returned correctly.");
         }
 
-        const initialMessageId =
-            response?.initialMessage?._id;
+        const initialMessageId = response?.initialMessage?._id;
 
-        if (
-            typeof initialMessageId !== "string" ||
-            !OBJECT_ID_PATTERN.test(initialMessageId)
-        ) {
+        if (typeof initialMessageId !== "string" || !OBJECT_ID_PATTERN.test(initialMessageId)) {
             // Chat may already exist, so preserve access.
             openConversation(conversationId);
 
-            toast.error(
-                "Chat created, but the initial message could not be verified."
-            );
+            toast.error("Chat created, but the initial message could not be verified.");
 
             return;
         }
 
-        openConversation(
-            conversationId,
-            initialMessageId
-        );
+        openConversation(conversationId, initialMessageId);
     };
 
-    const createDocumentChat = async (
-        files,
-        content,
-        clientRequestId
-    ) => {
+    const createDocumentChat = async (files, content, clientRequestId) => {
         const controller = new AbortController();
 
         uploadControllerRef.current = controller;
@@ -195,94 +163,53 @@ function ChatDashboard() {
         let uploadedConversationId = null;
 
         try {
-            const uploadResponse = await uploadDocuments(
-                files,
-                {
-                    signal: controller.signal,
+            const uploadResponse = await uploadDocuments(files, {
+                signal: controller.signal,
 
-                    onUploadProgress: (progress) => {
-                        if (!controller.signal.aborted) {
-                            setUploadProgress(progress);
-                        }
-                    },
-                }
-            );
+                onUploadProgress: (progress) => {
+                    if (!controller.signal.aborted) {
+                        setUploadProgress(progress);
+                    }
+                },
+            });
 
-            uploadedConversationId =
-                uploadResponse?.conversationId ||
-                uploadResponse?.conversation?._id;
+            uploadedConversationId = uploadResponse?.conversationId || uploadResponse?.conversation?._id;
 
-            if (
-                typeof uploadedConversationId !== "string" ||
-                !OBJECT_ID_PATTERN.test(uploadedConversationId)
-            ) {
-                throw new Error(
-                    "Uploaded conversation ID was not returned correctly."
-                );
+            if (typeof uploadedConversationId !== "string" || !OBJECT_ID_PATTERN.test(uploadedConversationId)) {
+                throw new Error("Uploaded conversation ID was not returned correctly.");
             }
 
             const documents = uploadResponse?.documents;
 
-            if (
-                !Array.isArray(documents) ||
-                documents.length !== files.length ||
-                documents.length > MAX_DOCUMENTS
-            ) {
-                throw new Error(
-                    "Uploaded document details are incomplete."
-                );
+            if (!Array.isArray(documents) || documents.length !== files.length || documents.length > MAX_DOCUMENTS) {
+                throw new Error("Uploaded document details are incomplete.");
             }
 
-            const documentIds = documents.map(
-                (document) => document._id
-            );
+            const documentIds = documents.map((document) => document._id);
 
             if (
-                documentIds.some(
-                    (id) =>
-                        typeof id !== "string" ||
-                        !OBJECT_ID_PATTERN.test(id)
-                ) ||
+                documentIds.some((id) => typeof id !== "string" || !OBJECT_ID_PATTERN.test(id)) ||
                 new Set(documentIds).size !== documentIds.length
             ) {
-                throw new Error(
-                    "Uploaded document IDs are invalid."
-                );
+                throw new Error("Uploaded document IDs are invalid.");
             }
 
             if (controller.signal.aborted) {
-                throw new DOMException(
-                    "Upload cancelled.",
-                    "AbortError"
-                );
+                throw new DOMException("Upload cancelled.", "AbortError");
             }
 
             setUploadProgress(null);
             uploadControllerRef.current = null;
 
-            const messageResponse = await sendMessage(
-                uploadedConversationId,
-                content,
-                clientRequestId,
-                documentIds
-            );
+            const messageResponse = await sendMessage(uploadedConversationId, content, clientRequestId, documentIds);
 
-            const savedMessageId =
-                messageResponse?.userMessage?._id;
+            const savedMessageId = messageResponse?.userMessage?._id;
 
-            if (
-                typeof savedMessageId !== "string" ||
-                !OBJECT_ID_PATTERN.test(savedMessageId)
-            ) {
-                throw new Error(
-                    "Saved document message was not returned correctly."
-                );
+            if (typeof savedMessageId !== "string" || !OBJECT_ID_PATTERN.test(savedMessageId)) {
+                throw new Error("Saved document message was not returned correctly.");
             }
 
-            openConversation(
-                uploadedConversationId,
-                savedMessageId
-            );
+            openConversation(uploadedConversationId, savedMessageId);
         } catch (error) {
             if (uploadedConversationId) {
                 toast.error(
@@ -316,56 +243,35 @@ function ChatDashboard() {
         }
 
         if (selectedFiles.length > MAX_DOCUMENTS) {
-            toast.error(
-                "Maximum 3 documents are allowed."
-            );
+            toast.error("Maximum 3 documents are allowed.");
             return;
         }
 
-        const finalContent = content ||
-            "Please summarize the attached document(s).";
+        const finalContent = content || "Please summarize the attached document(s).";
 
         sendingRef.current = true;
         setSending(true);
 
         try {
             if (!requestIdRef.current) {
-                requestIdRef.current =
-                    generateChatRequestId();
+                requestIdRef.current = generateChatRequestId();
             }
 
-            const clientRequestId =
-                requestIdRef.current;
+            const clientRequestId = requestIdRef.current;
 
             if (selectedFiles.length) {
-                await createDocumentChat(
-                    selectedFiles,
-                    finalContent,
-                    clientRequestId
-                );
+                await createDocumentChat(selectedFiles, finalContent, clientRequestId);
             } else {
-                await createNormalChat(
-                    finalContent,
-                    clientRequestId
-                );
+                await createNormalChat(finalContent, clientRequestId);
             }
         } catch (error) {
             const cancelled =
-                error?.name === "AbortError" ||
-                error?.name === "CanceledError" ||
-                error?.code === "ERR_CANCELED";
+                error?.name === "AbortError" || error?.name === "CanceledError" || error?.code === "ERR_CANCELED";
 
             if (cancelled) {
-                toast.info(
-                    "Document upload cancelled."
-                );
+                toast.info("Document upload cancelled.");
             } else {
-                toast.error(
-                    getErrorMessage(
-                        error,
-                        "Unable to start conversation. Please try again."
-                    )
-                );
+                toast.error(getErrorMessage(error, "Unable to start conversation. Please try again."));
             }
         } finally {
             sendingRef.current = false;
@@ -382,10 +288,7 @@ function ChatDashboard() {
                         <span> {firstName}?</span>
                     </h1>
 
-                    <p>
-                        Ask questions, explore ideas, understand code
-                        and work smarter with QueryNest AI.
-                    </p>
+                    <p>Ask questions, explore ideas, understand code and work smarter with QueryNest AI.</p>
                 </div>
                 <div className="chat-starter-grid" aria-label="Suggested prompts">
                     {starterPrompts.map((item) => (
@@ -393,9 +296,7 @@ function ChatDashboard() {
                             key={item.title}
                             type="button"
                             className="chat-starter-card"
-                            onClick={() =>
-                                handleStarterPrompt(item.prompt)
-                            }
+                            onClick={() => handleStarterPrompt(item.prompt)}
                             disabled={sending}
                         >
                             <span className="chat-starter-icon" aria-hidden="true">
@@ -407,7 +308,10 @@ function ChatDashboard() {
                                 <small>{item.description}</small>
                             </span>
 
-                            <i className="fa-solid fa-arrow-up-right-from-square chat-starter-arrow" aria-hidden="true" />
+                            <i
+                                className="fa-solid fa-arrow-up-right-from-square chat-starter-arrow"
+                                aria-hidden="true"
+                            />
                         </button>
                     ))}
                 </div>
@@ -425,7 +329,11 @@ function ChatDashboard() {
                     />
                 </div>
                 {uploadProgress !== null && (
-                    <div className="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3" role="status" aria-live="polite">
+                    <div
+                        className="d-flex flex-wrap align-items-center justify-content-center gap-3 mt-3"
+                        role="status"
+                        aria-live="polite"
+                    >
                         <span className="text-secondary small">
                             {uploadProgress < 100
                                 ? `Uploading documents: ${uploadProgress}%`
@@ -438,10 +346,7 @@ function ChatDashboard() {
                         </button>
                     </div>
                 )}
-                <p className="chat-dashboard-note">
-                    QueryNest AI can make mistakes.
-                    Verify important information.
-                </p>
+                <p className="chat-dashboard-note">QueryNest AI can make mistakes. Verify important information.</p>
             </div>
         </section>
     );

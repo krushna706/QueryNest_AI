@@ -1,11 +1,8 @@
-
 const { AIUsage, AIUsageCounter } = require("../models/AIUsage");
 
-const {
-    APP_USAGE_LIMITS,
-} = require("../config/usageLimits");
+const { APP_USAGE_LIMITS } = require("../config/usageLimits");
 
-// ================== UTC REPORTING PERIODS ==================
+// Utc reporting periods
 // Match daily quota windows used by usageService.js.
 function getPeriodStarts(now) {
     const today = new Date(now);
@@ -14,18 +11,9 @@ function getPeriodStarts(now) {
     const week = new Date(today);
 
     // Monday is the first day of the week.
-    week.setUTCDate(
-        week.getUTCDate() -
-        ((week.getUTCDay() + 6) % 7)
-    );
+    week.setUTCDate(week.getUTCDate() - ((week.getUTCDay() + 6) % 7));
 
-    const month = new Date(
-        Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth(),
-            1
-        )
-    );
+    const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     const minute = new Date(now);
     minute.setUTCSeconds(0, 0);
@@ -38,7 +26,7 @@ function getPeriodStarts(now) {
     };
 }
 
-// ================== PERIOD AGGREGATION ==================
+// Period aggregation
 function buildPeriodPipeline(start) {
     return [
         {
@@ -52,72 +40,49 @@ function buildPeriodPipeline(start) {
             $group: {
                 _id: "$provider",
 
-                // ================== REQUEST COUNT ==================
                 requests: {
                     $sum: 1,
                 },
 
-                // ================== TRACKED TOKENS ==================
                 tokens: {
                     $sum: {
-                        $ifNull: [
-                            "$actualTotalTokens",
-                            0,
-                        ],
+                        $ifNull: ["$actualTotalTokens", 0],
                     },
                 },
 
-                // ================== PROVIDER REPORTED TOKENS ==================
                 reportedTokens: {
                     $sum: {
                         $cond: [
                             {
-                                $eq: [
-                                    "$usageSource",
-                                    "reported",
-                                ],
+                                $eq: ["$usageSource", "reported"],
                             },
                             {
-                                $ifNull: [
-                                    "$actualTotalTokens",
-                                    0,
-                                ],
+                                $ifNull: ["$actualTotalTokens", 0],
                             },
                             0,
                         ],
                     },
                 },
 
-                // ================== ESTIMATED TOKENS ==================
                 estimatedTokens: {
                     $sum: {
                         $cond: [
                             {
-                                $eq: [
-                                    "$usageSource",
-                                    "estimated",
-                                ],
+                                $eq: ["$usageSource", "estimated"],
                             },
                             {
-                                $ifNull: [
-                                    "$actualTotalTokens",
-                                    0,
-                                ],
+                                $ifNull: ["$actualTotalTokens", 0],
                             },
                             0,
                         ],
                     },
                 },
 
-                // ================== ACTIVE REQUESTS ==================
                 pendingRequests: {
                     $sum: {
                         $cond: [
                             {
-                                $eq: [
-                                    "$status",
-                                    "streaming",
-                                ],
+                                $eq: ["$status", "streaming"],
                             },
                             1,
                             0,
@@ -129,7 +94,7 @@ function buildPeriodPipeline(start) {
     ];
 }
 
-// ================== EMPTY PROVIDER METRICS ==================
+// Empty provider metrics
 function emptyProviderMetrics() {
     return {
         requests: 0,
@@ -140,11 +105,8 @@ function emptyProviderMetrics() {
     };
 }
 
-// ================== PERIOD SUMMARY ==================
-function summarizePeriod(
-    records,
-    requestLimit = null
-) {
+// Period summary
+function summarizePeriod(records, requestLimit = null) {
     const providers = {
         groq: emptyProviderMetrics(),
         gemini: emptyProviderMetrics(),
@@ -170,13 +132,7 @@ function summarizePeriod(
             continue;
         }
 
-        for (const field of [
-            "requests",
-            "tokens",
-            "reportedTokens",
-            "estimatedTokens",
-            "pendingRequests",
-        ]) {
+        for (const field of ["requests", "tokens", "reportedTokens", "estimatedTokens", "pendingRequests"]) {
             const count = record[field] || 0;
 
             providers[provider][field] = count;
@@ -187,7 +143,7 @@ function summarizePeriod(
     return result;
 }
 
-// ================== LIVE REQUEST QUOTA ==================
+// Live request quota
 function buildQuota(counter, limit) {
     const used = counter?.used || 0;
     const reserved = counter?.reserved || 0;
@@ -197,17 +153,11 @@ function buildQuota(counter, limit) {
         reserved,
         limit,
 
-        remaining:
-            limit === null
-                ? null
-                : Math.max(
-                    0,
-                    limit - used - reserved
-                ),
+        remaining: limit === null ? null : Math.max(0, limit - used - reserved),
     };
 }
 
-// ================== GET MY AI USAGE ==================
+// Get my ai usage
 // GET /api/usage/me
 async function getMyUsage(req, res, next) {
     try {
@@ -217,14 +167,8 @@ async function getMyUsage(req, res, next) {
 
         const starts = getPeriodStarts(now);
 
-        const oldest = new Date(
-            Math.min(
-                starts.week.getTime(),
-                starts.month.getTime()
-            )
-        );
+        const oldest = new Date(Math.min(starts.week.getTime(), starts.month.getTime()));
 
-        // ================== FETCH USER USAGE ==================
         // Exclude requests that were never started.
         const [reports, counters] = await Promise.all([
             AIUsage.aggregate([
@@ -243,25 +187,17 @@ async function getMyUsage(req, res, next) {
                     },
                 },
 
-                // ================== DAILY / WEEKLY / MONTHLY ==================
                 {
                     $facet: {
-                        today: buildPeriodPipeline(
-                            starts.today
-                        ),
+                        today: buildPeriodPipeline(starts.today),
 
-                        week: buildPeriodPipeline(
-                            starts.week
-                        ),
+                        week: buildPeriodPipeline(starts.week),
 
-                        month: buildPeriodPipeline(
-                            starts.month
-                        ),
+                        month: buildPeriodPipeline(starts.month),
                     },
                 },
             ]),
 
-            // ================== CURRENT USER QUOTAS ==================
             AIUsageCounter.find({
                 scope: "user",
 
@@ -282,91 +218,54 @@ async function getMyUsage(req, res, next) {
                 .lean(),
         ]);
 
-        // ================== REPORT RESULTS ==================
         const report = reports[0] || {
             today: [],
             week: [],
             month: [],
         };
 
-        // ================== DAILY USAGE ==================
-        const today = summarizePeriod(
-            report.today,
-            APP_USAGE_LIMITS.requestsPerUserPerDay
-        );
+        const today = summarizePeriod(report.today, APP_USAGE_LIMITS.requestsPerUserPerDay);
 
-        // ================== WEEKLY USAGE ==================
-        const week = summarizePeriod(
-            report.week
-        );
+        const week = summarizePeriod(report.week);
 
-        // ================== MONTHLY USAGE ==================
-        const month = summarizePeriod(
-            report.month
-        );
+        const month = summarizePeriod(report.month);
 
-        // ================== FIND QUOTA COUNTERS ==================
-        const minuteCounter = counters.find(
-            (item) =>
-                item.metric === "requestsPerMinute"
-        );
+        const minuteCounter = counters.find((item) => item.metric === "requestsPerMinute");
 
-        const dailyCounter = counters.find(
-            (item) =>
-                item.metric === "requestsPerDay"
-        );
+        const dailyCounter = counters.find((item) => item.metric === "requestsPerDay");
 
-        // ================== REQUEST QUOTAS ==================
-        const requestsPerMinute = buildQuota(
-            minuteCounter,
-            APP_USAGE_LIMITS.requestsPerUserPerMinute
-        );
+        const requestsPerMinute = buildQuota(minuteCounter, APP_USAGE_LIMITS.requestsPerUserPerMinute);
 
-        const requestsPerDay = buildQuota(
-            dailyCounter,
-            APP_USAGE_LIMITS.requestsPerUserPerDay
-        );
+        const requestsPerDay = buildQuota(dailyCounter, APP_USAGE_LIMITS.requestsPerUserPerDay);
 
-        // ================== RESPONSE SECURITY ==================
-        res.set(
-            "Cache-Control",
-            "private, no-store"
-        );
+        res.set("Cache-Control", "private, no-store");
 
-        // ================== RESPONSE ==================
         return res.status(200).json({
             success: true,
 
             usage: {
-                // ================== USAGE PERIODS ==================
                 today,
                 week,
                 month,
 
-                // ================== PROVIDER BREAKDOWN ==================
                 // Existing Profile.jsx reads usage.providers.
                 // This top-level field represents today's usage.
                 providers: today.providers,
 
                 providersPeriod: "today",
 
-                // ================== PERIOD PROVIDERS ==================
                 providersByPeriod: {
                     today: today.providers,
                     week: week.providers,
                     month: month.providers,
                 },
 
-                // ================== APPLICATION LIMITS ==================
                 limits: {
-                    requestsPerMinute:
-                        APP_USAGE_LIMITS.requestsPerUserPerMinute,
+                    requestsPerMinute: APP_USAGE_LIMITS.requestsPerUserPerMinute,
 
-                    requestsPerDay:
-                        APP_USAGE_LIMITS.requestsPerUserPerDay,
+                    requestsPerDay: APP_USAGE_LIMITS.requestsPerUserPerDay,
 
-                    tokensPerDay:
-                        APP_USAGE_LIMITS.tokensPerUserPerDay,
+                    tokensPerDay: APP_USAGE_LIMITS.tokensPerUserPerDay,
 
                     // No weekly/monthly caps are configured.
                     requestsPerWeek: null,
@@ -376,13 +275,11 @@ async function getMyUsage(req, res, next) {
                     tokensPerMonth: null,
                 },
 
-                // ================== CURRENT QUOTAS ==================
                 quota: {
                     requestsPerMinute,
                     requestsPerDay,
                 },
 
-                // ================== REPORT METADATA ==================
                 timezone: "UTC",
 
                 periodsStartAt: {
@@ -393,17 +290,15 @@ async function getMyUsage(req, res, next) {
 
                 generatedAt: now.toISOString(),
 
-                note:
-                    "Token totals include reported and estimated usage. Active requests may not have final token totals.",
+                note: "Token totals include reported and estimated usage. Active requests may not have final token totals.",
             },
         });
-
     } catch (error) {
         return next(error);
     }
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     getMyUsage,
 };

@@ -1,9 +1,8 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== DOCUMENT TYPES ==================
+// Document types
 const DOCUMENT_MIME_TYPES = {
     pdf: "application/pdf",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -11,10 +10,10 @@ const DOCUMENT_MIME_TYPES = {
 
 const MAX_EXTRACTED_CHARACTERS = 300000;
 
-// ================== DOCUMENT SCHEMA ==================
+// Document schema
 const documentSchema = new Schema(
     {
-        // ================== OWNERSHIP ==================
+        // Ownership
         userId: {
             type: Schema.Types.ObjectId,
             ref: "User",
@@ -29,7 +28,7 @@ const documentSchema = new Schema(
             immutable: true,
         },
 
-        // ================== FILE METADATA ==================
+        // File metadata
         originalName: {
             type: String,
             required: true,
@@ -67,16 +66,10 @@ const documentSchema = new Schema(
             },
         },
 
-        // ================== PROCESSING ==================
+        // Processing
         status: {
             type: String,
-            enum: [
-                "uploaded",
-                "processing",
-                "ready",
-                "failed",
-                "deleting",
-            ],
+            enum: ["uploaded", "processing", "ready", "failed", "deleting"],
             default: "uploaded",
             required: true,
         },
@@ -87,16 +80,13 @@ const documentSchema = new Schema(
             min: 1,
             validate: {
                 validator(value) {
-                    return value == null || (
-                        this.fileType === "pdf" &&
-                        Number.isSafeInteger(value)
-                    );
+                    return value == null || (this.fileType === "pdf" && Number.isSafeInteger(value));
                 },
                 message: "Page count is supported only for PDFs.",
             },
         },
 
-        // ================== EXTRACTED CONTENT ==================
+        // Extracted content
         extractedText: {
             type: String,
             default: "",
@@ -125,7 +115,7 @@ const documentSchema = new Schema(
             validate: Number.isSafeInteger,
         },
 
-        // ================== PROCESSING RESULT ==================
+        // Processing result
         errorCode: {
             type: String,
             default: null,
@@ -143,7 +133,7 @@ const documentSchema = new Schema(
     }
 );
 
-// ================== DATABASE INDEXES ==================
+// Database indexes
 documentSchema.index({
     userId: 1,
     conversationId: 1,
@@ -151,15 +141,11 @@ documentSchema.index({
     createdAt: -1,
 });
 
-// ================== SHARED EXTRACTION LIMIT ==================
-documentSchema.statics.MAX_EXTRACTED_CHARACTERS =
-    MAX_EXTRACTED_CHARACTERS;
+// Shared extraction limit
+documentSchema.statics.MAX_EXTRACTED_CHARACTERS = MAX_EXTRACTED_CHARACTERS;
 
-// ================== MODEL ==================
-const Document = mongoose.model(
-    "Document",
-    documentSchema
-);
+// Model
+const Document = mongoose.model("Document", documentSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = Document;

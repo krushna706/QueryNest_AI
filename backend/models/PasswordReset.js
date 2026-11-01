@@ -1,9 +1,8 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== PASSWORD RESET SCHEMA ==================
+// Password reset schema
 const passwordResetSchema = new Schema(
     {
         userId: {
@@ -13,7 +12,7 @@ const passwordResetSchema = new Schema(
             unique: true,
         },
 
-        // ================== EMAIL OTP ==================
+        // Email otp
         otpHash: {
             type: String,
             default: null,
@@ -33,7 +32,7 @@ const passwordResetSchema = new Schema(
             max: 5,
         },
 
-        // ================== REQUEST LIMITS ==================
+        // Request limits
         resendAvailableAt: {
             type: Date,
             default: null,
@@ -51,7 +50,7 @@ const passwordResetSchema = new Schema(
             max: 10,
         },
 
-        // ================== RESET VERIFICATION ==================
+        // Reset verification
         verificationTokenHash: {
             type: String,
             default: null,
@@ -79,14 +78,11 @@ const passwordResetSchema = new Schema(
     }
 );
 
-// ================== TTL INDEX ==================
-passwordResetSchema.index(
-    { updatedAt: 1 },
-    { expireAfterSeconds: 86400 }
-);
+// Ttl index
+passwordResetSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 86400 });
 
-// ================== MODEL ==================
+// Model
 const PasswordReset = mongoose.model("PasswordReset", passwordResetSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = PasswordReset;

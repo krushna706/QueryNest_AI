@@ -6,12 +6,12 @@ import { toast } from "react-toastify";
 import AuthLayout from "../layouts/AuthLayout";
 import api from "../services/api";
 
-// ================== RECOVERY CONFIGURATION ==================
+// Recovery configuration
 const OTP_LENGTH = 6;
 const OTP_VALIDITY_MINUTES = 10;
 const DEFAULT_RESEND_SECONDS = 60;
 
-// ================== RECOVERY STEPS ==================
+// Recovery steps
 const recoverySteps = [
     {
         title: "Forgot Password",
@@ -30,7 +30,7 @@ const recoverySteps = [
     },
 ];
 
-// ================== API ERROR MESSAGE ==================
+// Api error message
 function getErrorMessage(error, fallback) {
     if (error.response?.status === 429) {
         return "Too many requests. Please try again later.";
@@ -47,15 +47,12 @@ function getErrorMessage(error, fallback) {
     return error.response.data?.message || fallback;
 }
 
-// ================== IDENTIFIER VALIDATION ==================
+// Identifier validation
 function validIdentifier(value) {
-    return (
-        /^[6-9]\d{9}$/.test(value) ||
-        (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254)
-    );
+    return /^[6-9]\d{9}$/.test(value) || (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254);
 }
 
-// ================== PASSWORD VISIBILITY ==================
+// Password visibility
 function PasswordVisibility({ visible, onToggle, label, disabled }) {
     return (
         <InputAdornment position="end">
@@ -75,7 +72,7 @@ function PasswordVisibility({ visible, onToggle, label, disabled }) {
     );
 }
 
-// ================== FORGOT PASSWORD PAGE ==================
+// Forgot password page
 function ForgotPassword() {
     const navigate = useNavigate();
     const submitLock = useRef(false);
@@ -105,9 +102,7 @@ function ForgotPassword() {
         }
 
         const updateRemaining = () => {
-            setResendSeconds(
-                Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
-            );
+            setResendSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)));
         };
 
         updateRemaining();
@@ -120,9 +115,7 @@ function ForgotPassword() {
     function startCooldown(seconds = DEFAULT_RESEND_SECONDS) {
         const duration = Number(seconds);
 
-        const safeSeconds = Number.isFinite(duration) && duration > 0
-            ? duration
-            : DEFAULT_RESEND_SECONDS;
+        const safeSeconds = Number.isFinite(duration) && duration > 0 ? duration : DEFAULT_RESEND_SECONDS;
 
         setResendAt(Date.now() + safeSeconds * 1000);
         setResendSeconds(Math.ceil(safeSeconds));
@@ -160,10 +153,7 @@ function ForgotPassword() {
             setResetToken("");
             setMaskedEmail("");
 
-            setNotice(
-                data.message ||
-                "If your account is active, an OTP will be sent to your registered email."
-            );
+            setNotice(data.message || "If your account is active, an OTP will be sent to your registered email.");
 
             startCooldown(data.resendCooldownSeconds);
             setStep(1);
@@ -200,10 +190,7 @@ function ForgotPassword() {
                 { skipSessionHandling: true }
             );
 
-            if (
-                !data?.success ||
-                !/^[a-f0-9]{64}$/.test(data.resetToken || "")
-            ) {
+            if (!data?.success || !/^[a-f0-9]{64}$/.test(data.resetToken || "")) {
                 throw new Error("OTP verification failed.");
             }
 
@@ -223,10 +210,7 @@ function ForgotPassword() {
     }
 
     async function resetPassword() {
-        if (
-            newPassword.length < 6 ||
-            new TextEncoder().encode(newPassword).length > 72
-        ) {
+        if (newPassword.length < 6 || new TextEncoder().encode(newPassword).length > 72) {
             setError("Password must be at least 6 characters and at most 72 UTF-8 bytes.");
             return;
         }
@@ -331,8 +315,7 @@ function ForgotPassword() {
             description={currentStep.description}
             footer={
                 <p className="auth-switch">
-                    Remember your password?{" "}
-                    <Link to="/login">Sign In</Link>
+                    Remember your password? <Link to="/login">Sign In</Link>
                 </p>
             }
         >
@@ -341,11 +324,7 @@ function ForgotPassword() {
                 <span className="auth-feature-icon">
                     <i
                         className={`fa-solid ${
-                            step === 0
-                                ? "fa-user-shield"
-                                : step === 1
-                                  ? "fa-envelope-circle-check"
-                                  : "fa-lock"
+                            step === 0 ? "fa-user-shield" : step === 1 ? "fa-envelope-circle-check" : "fa-lock"
                         }`}
                         aria-hidden="true"
                     />
@@ -400,11 +379,7 @@ function ForgotPassword() {
                             value={otp}
                             disabled={busy}
                             onChange={(event) => {
-                                setOtp(
-                                    event.target.value
-                                        .replace(/\D/g, "")
-                                        .slice(0, OTP_LENGTH)
-                                );
+                                setOtp(event.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH));
                                 setError("");
                             }}
                             fullWidth
@@ -420,10 +395,13 @@ function ForgotPassword() {
                             }}
                         />
 
-                        <Button type="button" className="auth-restart" disabled={busy || resendSeconds > 0} onClick={handleResend}>
-                            {resendSeconds > 0
-                                ? `Resend OTP in ${resendSeconds}s`
-                                : "Resend OTP"}
+                        <Button
+                            type="button"
+                            className="auth-restart"
+                            disabled={busy || resendSeconds > 0}
+                            onClick={handleResend}
+                        >
+                            {resendSeconds > 0 ? `Resend OTP in ${resendSeconds}s` : "Resend OTP"}
                         </Button>
                     </>
                 )}
@@ -463,9 +441,7 @@ function ForgotPassword() {
                                     endAdornment: (
                                         <PasswordVisibility
                                             visible={showPassword}
-                                            onToggle={() =>
-                                                setShowPassword((value) => !value)
-                                            }
+                                            onToggle={() => setShowPassword((value) => !value)}
                                             label="password"
                                             disabled={busy}
                                         />
@@ -495,9 +471,7 @@ function ForgotPassword() {
                                     endAdornment: (
                                         <PasswordVisibility
                                             visible={showConfirmPassword}
-                                            onToggle={() =>
-                                                setShowConfirmPassword((value) => !value)
-                                            }
+                                            onToggle={() => setShowConfirmPassword((value) => !value)}
                                             label="confirm password"
                                             disabled={busy}
                                         />
@@ -512,7 +486,14 @@ function ForgotPassword() {
                         {error}
                     </div>
                 )}
-                <Button type="submit" variant="contained" className="auth-submit" disabled={busy} disableElevation fullWidth>
+                <Button
+                    type="submit"
+                    variant="contained"
+                    className="auth-submit"
+                    disabled={busy}
+                    disableElevation
+                    fullWidth
+                >
                     {busy ? (
                         <>
                             <CircularProgress size={18} color="inherit" />

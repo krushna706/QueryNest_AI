@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import "../css/auth.css";
 
-// ================== INTRODUCTION CONTENT ==================
+// Introduction content
 const features = [
     {
         icon: "fa-comments",
@@ -21,19 +21,16 @@ const features = [
     },
 ];
 
-// ================== AUTH LAYOUT ==================
+// Auth layout
 function AuthLayout({ title, description, children, footer }) {
     return (
         <div className="auth-layout">
             <main className="auth-main">
                 <div className="auth-card">
-
                     {/* Introduction */}
                     <aside className="auth-introduction">
                         <div className="auth-introduction-content">
-                            <span className="auth-section-label">
-                                YOUR INTELLIGENT AI ASSISTANT
-                            </span>
+                            <span className="auth-section-label">YOUR INTELLIGENT AI ASSISTANT</span>
 
                             <h2 className="auth-introduction-title">
                                 Think Smarter.
@@ -41,8 +38,7 @@ function AuthLayout({ title, description, children, footer }) {
                             </h2>
 
                             <p className="auth-introduction-description">
-                                One intelligent workspace for conversations,
-                                documents and meaningful insights.
+                                One intelligent workspace for conversations, documents and meaningful insights.
                             </p>
 
                             <ul className="auth-features">
@@ -61,9 +57,7 @@ function AuthLayout({ title, description, children, footer }) {
                             </ul>
                         </div>
 
-                        <p className="auth-introduction-note">
-                            Smart Conversations. Smarter Insights.
-                        </p>
+                        <p className="auth-introduction-note">Smart Conversations. Smarter Insights.</p>
                     </aside>
 
                     {/* Authentication form */}
@@ -71,29 +65,24 @@ function AuthLayout({ title, description, children, footer }) {
                         <div className="auth-form-content">
                             <header className="auth-form-header">
                                 <Link to="/login" className="auth-brand" aria-label="QueryNest AI">
-                                    <img src="/images/QueryNest_AI_Logo.png" alt="QueryNest AI" width="270" height="90" />
+                                    <img
+                                        src="/images/QueryNest_AI_Logo.png"
+                                        alt="QueryNest AI"
+                                        width="270"
+                                        height="90"
+                                    />
                                 </Link>
 
                                 <h1 id="auth-page-title" className="auth-form-title">
                                     {title}
                                 </h1>
 
-                                {description && (
-                                    <p className="auth-form-description">
-                                        {description}
-                                    </p>
-                                )}
+                                {description && <p className="auth-form-description">{description}</p>}
                             </header>
 
-                            <div className="auth-form-body">
-                                {children}
-                            </div>
+                            <div className="auth-form-body">{children}</div>
 
-                            {footer && (
-                                <div className="auth-form-footer">
-                                    {footer}
-                                </div>
-                            )}
+                            {footer && <div className="auth-form-footer">{footer}</div>}
                         </div>
                     </section>
                 </div>

@@ -1,10 +1,8 @@
-
-// ================== AI PROVIDER USAGE LIMITS ==================
+// Ai provider usage limits
 // Baseline limits from the October 2026 provider dashboards.
 // Actual limits may change. Recheck before deployment.
 const PROVIDER_USAGE_LIMITS = {
-
-    // ================== GROQ LIMITS ==================
+    // Groq limits
     groq: {
         requestsPerMinute: 30,
         requestsPerDay: 1000,
@@ -12,7 +10,7 @@ const PROVIDER_USAGE_LIMITS = {
         tokensPerDay: 200000,
     },
 
-    // ================== GEMINI LIMITS ==================
+    // Gemini limits
     gemini: {
         requestsPerMinute: 15,
         requestsPerDay: 500,
@@ -24,10 +22,9 @@ const PROVIDER_USAGE_LIMITS = {
     },
 };
 
-// ================== APPLICATION USAGE LIMITS ==================
+// Application usage limits
 const APP_USAGE_LIMITS = {
-
-    // ================== USER CHAT LIMITS ==================
+    // User chat limits
     requestsPerUserPerMinute: 5,
     requestsPerUserPerDay: 100,
 
@@ -35,20 +32,20 @@ const APP_USAGE_LIMITS = {
     // Shared provider quotas are still enforced.
     tokensPerUserPerDay: null,
 
-    // ================== AI RESPONSE LIMITS ==================
+    // Ai response limits
     maxOutputTokensPerRequest: 4096,
 
-    // ================== CONCURRENCY LIMITS ==================
+    // Concurrency limits
     maxActiveGenerationsPerUser: 1,
     maxQueuedRequests: 10,
 
-    // ================== PDF DOCUMENT LIMITS ==================
+    // Pdf document limits
     maxPdfPerConversation: 3,
     maxPdfSizeBytes: 5 * 1024 * 1024,
     maxPagesPerConversation: 30,
 };
 
-// ================== GET PROVIDER LIMITS ==================
+// Get provider limits
 function getProviderUsageLimits(provider) {
     const limits = PROVIDER_USAGE_LIMITS[provider];
 
@@ -59,7 +56,7 @@ function getProviderUsageLimits(provider) {
     return limits;
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     PROVIDER_USAGE_LIMITS,
     APP_USAGE_LIMITS,

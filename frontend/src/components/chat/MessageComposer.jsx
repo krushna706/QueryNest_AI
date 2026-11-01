@@ -1,29 +1,27 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { DOCUMENT_LIMITS, COMPOSER_LIMITS } from "../../config/appConfig";
+import { useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { toast } from "react-toastify";
 
-// ================== FILE LIMITS ==================
-const MAX_FILES = 3;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// File limits
+const MAX_FILES = DOCUMENT_LIMITS.maxFiles;
+const MAX_FILE_SIZE = DOCUMENT_LIMITS.maxFileSize;
 
-// ================== TEXTAREA LIMITS ==================
-const MIN_TEXTAREA_HEIGHT = 38;
-const MAX_TEXTAREA_HEIGHT = 250;
+// Textarea limits
+const MIN_TEXTAREA_HEIGHT = COMPOSER_LIMITS.minHeight;
+const MAX_TEXTAREA_HEIGHT = COMPOSER_LIMITS.maxHeight;
 
-// ================== ALLOWED FILE TYPES ==================
-const ALLOWED_EXTENSIONS = new Set([
-    "pdf",
-    "docx",
-]);
+// Allowed file types
+const ALLOWED_EXTENSIONS = new Set(DOCUMENT_LIMITS.extensions);
 
-// ================== SHOW VALIDATION TOAST ==================
+// Show validation toast
 function showFileError(message) {
     toast.error(message, {
         toastId: `composer:${message}`,
     });
 }
 
-// ================== FORMAT FILE SIZE ==================
+// Format file size
 function formatFileSize(bytes) {
     if (bytes < 1024 * 1024) {
         return `${(bytes / 1024).toFixed(1)} KB`;
@@ -32,7 +30,7 @@ function formatFileSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-// ================== MESSAGE COMPOSER ==================
+// Message composer
 function MessageComposer({
     inputId,
     value,
@@ -47,36 +45,15 @@ function MessageComposer({
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    const messageText =
-        typeof value === "string" ? value : "";
+    const messageText = typeof value === "string" ? value : "";
 
-    const selectedFiles = Array.isArray(attachments)
-        ? attachments
-        : [];
+    const selectedFiles = Array.isArray(attachments) ? attachments : [];
 
-    const canSend =
-        !sending &&
-        (
-            messageText.trim().length > 0 ||
-            selectedFiles.length > 0
-        );
+    const canSend = !sending && (messageText.trim().length > 0 || selectedFiles.length > 0);
 
-    const canAttach =
-        !sending &&
-        selectedFiles.length < MAX_FILES;
+    const canAttach = !sending && selectedFiles.length < MAX_FILES;
 
-    const setTextareaRef = useCallback(
-        (element) => {
-            textareaRef.current = element;
-
-            if (typeof inputRef === "function") {
-                inputRef(element);
-            } else if (inputRef) {
-                inputRef.current = element;
-            }
-        },
-        [inputRef]
-    );
+    useImperativeHandle(inputRef, () => textareaRef.current, []);
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current;
@@ -88,26 +65,15 @@ function MessageComposer({
 
         const contentHeight = textarea.scrollHeight;
 
-        const nextHeight = Math.min(
-            Math.max(
-                contentHeight,
-                MIN_TEXTAREA_HEIGHT
-            ),
-            MAX_TEXTAREA_HEIGHT
-        );
+        const nextHeight = Math.min(Math.max(contentHeight, MIN_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
 
         textarea.style.height = `${nextHeight}px`;
 
-        textarea.style.overflowY =
-            contentHeight > MAX_TEXTAREA_HEIGHT
-                ? "auto"
-                : "hidden";
+        textarea.style.overflowY = contentHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
     }, [messageText]);
 
     function handleFileSelect(event) {
-        const files = Array.from(
-            event.target.files || []
-        );
+        const files = Array.from(event.target.files || []);
 
         // Allow selecting the same file again later.
         event.target.value = "";
@@ -119,25 +85,15 @@ function MessageComposer({
         const updatedFiles = [...selectedFiles];
 
         for (const file of files) {
-            const extension = file.name
-                .split(".")
-                .pop()
-                .toLowerCase();
+            const extension = file.name.split(".").pop().toLowerCase();
 
             if (!ALLOWED_EXTENSIONS.has(extension)) {
-                showFileError(
-                    "Please upload a PDF or Word document."
-                );
+                showFileError("Please upload a PDF or Word document.");
                 continue;
             }
 
-            if (
-                file.size <= 0 ||
-                file.size > MAX_FILE_SIZE
-            ) {
-                showFileError(
-                    "Each document must be smaller than 5 MB."
-                );
+            if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
+                showFileError("Each document must be smaller than 5 MB.");
                 continue;
             }
 
@@ -145,50 +101,35 @@ function MessageComposer({
                 (existing) =>
                     existing.name === file.name &&
                     existing.size === file.size &&
-                    existing.lastModified ===
-                        file.lastModified
+                    existing.lastModified === file.lastModified
             );
 
             if (duplicate) {
-                toast.info(
-                    "This document is already attached.",
-                    {
-                        toastId: "composer:duplicate-file",
-                    }
-                );
+                toast.info("This document is already attached.", {
+                    toastId: "composer:duplicate-file",
+                });
                 continue;
             }
 
             if (updatedFiles.length >= MAX_FILES) {
-                showFileError(
-                    "You can attach up to 3 documents at a time."
-                );
+                showFileError("You can attach up to 3 documents at a time.");
                 break;
             }
 
             updatedFiles.push(file);
         }
 
-        if (
-            typeof onAttachmentsChange === "function"
-        ) {
+        if (typeof onAttachmentsChange === "function") {
             onAttachmentsChange(updatedFiles);
         }
     }
 
     function handleRemoveFile(fileToRemove) {
-        if (
-            sending ||
-            typeof onAttachmentsChange !== "function"
-        ) {
+        if (sending || typeof onAttachmentsChange !== "function") {
             return;
         }
 
-        onAttachmentsChange(
-            selectedFiles.filter(
-                (file) => file !== fileToRemove
-            )
-        );
+        onAttachmentsChange(selectedFiles.filter((file) => file !== fileToRemove));
     }
 
     function handleAttachClick() {
@@ -198,11 +139,7 @@ function MessageComposer({
     }
 
     function handleKeyDown(event) {
-        if (
-            event.key !== "Enter" ||
-            event.shiftKey ||
-            event.nativeEvent.isComposing
-        ) {
+        if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
 
@@ -218,27 +155,28 @@ function MessageComposer({
             {selectedFiles.length > 0 && (
                 <div className="d-flex flex-wrap qn-composer-documents" aria-label="Selected documents">
                     {selectedFiles.map((file) => {
-                        const isPDF = file.name
-                            .toLowerCase()
-                            .endsWith(".pdf");
+                        const isPDF = file.name.toLowerCase().endsWith(".pdf");
 
                         return (
-                            <div key={`${file.name}-${file.size}-${file.lastModified}`} className="d-inline-flex align-items-center qn-composer-document">
-                                <i className={`${isPDF ? "fa-regular fa-file-pdf" : "fa-regular fa-file-word"} qn-composer-file-icon`} aria-hidden="true" />
+                            <div
+                                key={`${file.name}-${file.size}-${file.lastModified}`}
+                                className="d-inline-flex align-items-center qn-composer-document"
+                            >
+                                <i
+                                    className={`${isPDF ? "fa-regular fa-file-pdf" : "fa-regular fa-file-word"} qn-composer-file-icon`}
+                                    aria-hidden="true"
+                                />
                                 <div className="qn-composer-file-details">
                                     <span className="qn-composer-file-name" title={file.name}>
                                         {file.name}
                                     </span>
 
-                                    <span className="qn-composer-file-size">
-                                        {formatFileSize(file.size)}
-                                    </span>
+                                    <span className="qn-composer-file-size">{formatFileSize(file.size)}</span>
                                 </div>
-                                <button className="qn-composer-remove-file"
+                                <button
+                                    className="qn-composer-remove-file"
                                     type="button"
-                                    onClick={() =>
-                                        handleRemoveFile(file)
-                                    }
+                                    onClick={() => handleRemoveFile(file)}
                                     disabled={sending}
                                     title="Remove attachment"
                                     aria-label={`Remove ${file.name}`}
@@ -256,11 +194,7 @@ function MessageComposer({
                     className="chat-composer-attach qn-composer-attach-button"
                     onClick={handleAttachClick}
                     disabled={!canAttach}
-                    title={
-                        canAttach
-                            ? "Attach PDF or Word document"
-                            : "Attachment limit reached"
-                    }
+                    title={canAttach ? "Attach PDF or Word document" : "Attachment limit reached"}
                     aria-label="Attach PDF or Word document"
                 >
                     <i className="fa-solid fa-paperclip" aria-hidden="true" />
@@ -270,9 +204,10 @@ function MessageComposer({
                         Type your message
                     </label>
 
-                    <textarea className="qn-composer-textarea"
+                    <textarea
+                        className="qn-composer-textarea"
                         id={inputId}
-                        ref={setTextareaRef}
+                        ref={textareaRef}
                         value={messageText}
                         onChange={onChange}
                         onKeyDown={handleKeyDown}
@@ -287,18 +222,13 @@ function MessageComposer({
                     type="submit"
                     className="chat-composer-send qn-composer-send-button"
                     disabled={!canSend}
-                    title={
-                        sending
-                            ? "Sending message"
-                            : "Send message"
-                    }
-                    aria-label={
-                        sending
-                            ? "Sending message"
-                            : "Send message"
-                    }
+                    title={sending ? "Sending message" : "Send message"}
+                    aria-label={sending ? "Sending message" : "Send message"}
                 >
-                    <i className={ sending ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-up" } aria-hidden="true" />
+                    <i
+                        className={sending ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-arrow-up"}
+                        aria-hidden="true"
+                    />
                 </button>
             </div>
             <input

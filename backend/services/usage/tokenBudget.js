@@ -1,10 +1,6 @@
+const { APP_USAGE_LIMITS, getProviderUsageLimits } = require("../../config/usageLimits");
 
-const {
-    APP_USAGE_LIMITS,
-    getProviderUsageLimits,
-} = require("../../config/usageLimits");
-
-// ================== REMAINING QUOTA ==================
+// Remaining quota
 function getRemaining(snapshot, metric, limit, scope) {
     // Null means no application-level cap for this metric.
     // Provider quotas are still enforced independently.
@@ -18,8 +14,10 @@ function getRemaining(snapshot, metric, limit, scope) {
     const reserved = snapshot?.[metric]?.reserved;
 
     if (
-        !Number.isSafeInteger(used) || used < 0 ||
-        !Number.isSafeInteger(reserved) || reserved < 0 ||
+        !Number.isSafeInteger(used) ||
+        used < 0 ||
+        !Number.isSafeInteger(reserved) ||
+        reserved < 0 ||
         !Number.isSafeInteger(used + reserved)
     ) {
         throw new Error(`Missing or invalid ${scope} counter: ${metric}.`);
@@ -28,7 +26,7 @@ function getRemaining(snapshot, metric, limit, scope) {
     return Math.max(0, limit - used - reserved);
 }
 
-// ================== USER BUDGET SNAPSHOT ==================
+// User budget snapshot
 function getUserBudgetSnapshot(userUsage) {
     return {
         remainingRequestsPerMinute: getRemaining(
@@ -45,16 +43,11 @@ function getUserBudgetSnapshot(userUsage) {
             "user"
         ),
 
-        remainingTokensPerDay: getRemaining(
-            userUsage,
-            "tokensPerDay",
-            APP_USAGE_LIMITS.tokensPerUserPerDay,
-            "user"
-        ),
+        remainingTokensPerDay: getRemaining(userUsage, "tokensPerDay", APP_USAGE_LIMITS.tokensPerUserPerDay, "user"),
     };
 }
 
-// ================== PROVIDER BUDGET SNAPSHOT ==================
+// Provider budget snapshot
 function getProviderBudgetSnapshot(provider, providerUsage) {
     const limits = getProviderUsageLimits(provider);
 
@@ -66,19 +59,9 @@ function getProviderBudgetSnapshot(provider, providerUsage) {
             provider
         ),
 
-        remainingRequestsPerDay: getRemaining(
-            providerUsage,
-            "requestsPerDay",
-            limits.requestsPerDay,
-            provider
-        ),
+        remainingRequestsPerDay: getRemaining(providerUsage, "requestsPerDay", limits.requestsPerDay, provider),
 
-        remainingTokensPerMinute: getRemaining(
-            providerUsage,
-            "tokensPerMinute",
-            limits.tokensPerMinute,
-            provider
-        ),
+        remainingTokensPerMinute: getRemaining(providerUsage, "tokensPerMinute", limits.tokensPerMinute, provider),
 
         remainingInputTokensPerMinute: getRemaining(
             providerUsage,
@@ -87,87 +70,51 @@ function getProviderBudgetSnapshot(provider, providerUsage) {
             provider
         ),
 
-        remainingTokensPerDay: getRemaining(
-            providerUsage,
-            "tokensPerDay",
-            limits.tokensPerDay,
-            provider
-        ),
+        remainingTokensPerDay: getRemaining(providerUsage, "tokensPerDay", limits.tokensPerDay, provider),
     };
 
-    budget.available = Object.values(budget).every(
-        (remaining) => remaining === null || remaining > 0
-    );
+    budget.available = Object.values(budget).every((remaining) => remaining === null || remaining > 0);
 
     return budget;
 }
 
-// ================== CHECK TOKEN BUDGET ==================
+// Check token budget
 function checkTokenBudget({
     provider,
     estimatedInputTokens,
-     maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
+    maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     userUsage,
     providerUsage,
 } = {}) {
-
-    // ================== VALIDATE TOKEN ESTIMATE ==================
     if (
         !Number.isSafeInteger(estimatedInputTokens) ||
         estimatedInputTokens < 1 ||
         !Number.isSafeInteger(maxOutputTokens) ||
         maxOutputTokens < 1 ||
-        !Number.isSafeInteger(
-            estimatedInputTokens + maxOutputTokens
-        )
+        !Number.isSafeInteger(estimatedInputTokens + maxOutputTokens)
     ) {
         throw new Error("Invalid AI token estimate.");
     }
 
-    // ================== OUTPUT LIMIT ==================
-    const maxAllowedOutput =
-        APP_USAGE_LIMITS.maxOutputTokensPerRequest;
+    const maxAllowedOutput = APP_USAGE_LIMITS.maxOutputTokensPerRequest;
 
     if (
         maxAllowedOutput != null &&
-        (
-            !Number.isSafeInteger(maxAllowedOutput) ||
-            maxAllowedOutput < 1 ||
-            maxOutputTokens > maxAllowedOutput
-        )
+        (!Number.isSafeInteger(maxAllowedOutput) || maxAllowedOutput < 1 || maxOutputTokens > maxAllowedOutput)
     ) {
         throw new Error("AI output token limit exceeded.");
     }
 
-    // ================== ESTIMATED TOTAL TOKENS ==================
-    const estimatedTotalTokens =
-        estimatedInputTokens + maxOutputTokens;
+    const estimatedTotalTokens = estimatedInputTokens + maxOutputTokens;
 
-    // ================== CURRENT USAGE ==================
     const userBudget = getUserBudgetSnapshot(userUsage);
 
-    const providerBudget = getProviderBudgetSnapshot(
-        provider,
-        providerUsage
-    );
+    const providerBudget = getProviderBudgetSnapshot(provider, providerUsage);
 
-    // ================== USER LIMITS ==================
     const userChecks = [
-        [
-            "USER_RPM_LIMIT",
-            "remainingRequestsPerMinute",
-            1,
-        ],
-        [
-            "USER_DAILY_REQUEST_LIMIT",
-            "remainingRequestsPerDay",
-            1,
-        ],
-        [
-            "USER_DAILY_TOKEN_LIMIT",
-            "remainingTokensPerDay",
-            estimatedTotalTokens,
-        ],
+        ["USER_RPM_LIMIT", "remainingRequestsPerMinute", 1],
+        ["USER_DAILY_REQUEST_LIMIT", "remainingRequestsPerDay", 1],
+        ["USER_DAILY_TOKEN_LIMIT", "remainingTokensPerDay", estimatedTotalTokens],
     ];
 
     for (const [code, key, required] of userChecks) {
@@ -186,33 +133,12 @@ function checkTokenBudget({
         }
     }
 
-    // ================== PROVIDER LIMITS ==================
     const providerChecks = [
-        [
-            "PROVIDER_RPM_LIMIT",
-            "remainingRequestsPerMinute",
-            1,
-        ],
-        [
-            "PROVIDER_DAILY_REQUEST_LIMIT",
-            "remainingRequestsPerDay",
-            1,
-        ],
-        [
-            "PROVIDER_TPM_LIMIT",
-            "remainingTokensPerMinute",
-            estimatedTotalTokens,
-        ],
-        [
-            "PROVIDER_INPUT_TPM_LIMIT",
-            "remainingInputTokensPerMinute",
-            estimatedInputTokens,
-        ],
-        [
-            "PROVIDER_DAILY_TOKEN_LIMIT",
-            "remainingTokensPerDay",
-            estimatedTotalTokens,
-        ],
+        ["PROVIDER_RPM_LIMIT", "remainingRequestsPerMinute", 1],
+        ["PROVIDER_DAILY_REQUEST_LIMIT", "remainingRequestsPerDay", 1],
+        ["PROVIDER_TPM_LIMIT", "remainingTokensPerMinute", estimatedTotalTokens],
+        ["PROVIDER_INPUT_TPM_LIMIT", "remainingInputTokensPerMinute", estimatedInputTokens],
+        ["PROVIDER_DAILY_TOKEN_LIMIT", "remainingTokensPerDay", estimatedTotalTokens],
     ];
 
     for (const [code, key, required] of providerChecks) {
@@ -230,7 +156,6 @@ function checkTokenBudget({
         }
     }
 
-    // ================== PROVIDER RESERVATION ==================
     const providerLimits = getProviderUsageLimits(provider);
 
     const providerCounters = {
@@ -239,36 +164,34 @@ function checkTokenBudget({
 
         ...(providerLimits.tokensPerMinute != null
             ? {
-                tokensPerMinute: estimatedTotalTokens,
-            }
+                  tokensPerMinute: estimatedTotalTokens,
+              }
             : {}),
 
         ...(providerLimits.inputTokensPerMinute != null
             ? {
-                inputTokensPerMinute: estimatedInputTokens,
-            }
+                  inputTokensPerMinute: estimatedInputTokens,
+              }
             : {}),
 
         ...(providerLimits.tokensPerDay != null
             ? {
-                tokensPerDay: estimatedTotalTokens,
-            }
+                  tokensPerDay: estimatedTotalTokens,
+              }
             : {}),
     };
 
-    // ================== USER RESERVATION ==================
     const userCounters = {
         requestsPerMinute: 1,
         requestsPerDay: 1,
 
         ...(APP_USAGE_LIMITS.tokensPerUserPerDay != null
             ? {
-                tokensPerDay: estimatedTotalTokens,
-            }
+                  tokensPerDay: estimatedTotalTokens,
+              }
             : {}),
     };
 
-    // ================== ALLOWED RESPONSE ==================
     return {
         allowed: true,
         code: "OK",
@@ -287,7 +210,7 @@ function checkTokenBudget({
     };
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     getUserBudgetSnapshot,
     getProviderBudgetSnapshot,

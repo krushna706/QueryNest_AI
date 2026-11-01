@@ -1,31 +1,26 @@
+import { DOCUMENT_LIMITS } from "../config/appConfig";
 import api from "./api";
 
-// ================== DOCUMENT LIMITS ==================
-const MAX_FILES = 3;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Document limits
+const MAX_FILES = DOCUMENT_LIMITS.maxFiles;
+const MAX_FILE_SIZE = DOCUMENT_LIMITS.maxFileSize;
 
-const ALLOWED_EXTENSIONS = ["pdf", "docx"];
+const ALLOWED_EXTENSIONS = DOCUMENT_LIMITS.extensions;
 
-// ================== VALIDATE DOCUMENT ID ==================
+// Validate document id
 function validateDocumentId(id, fieldName = "Document ID") {
-    if (
-        typeof id !== "string" ||
-        !/^[a-f0-9]{24}$/i.test(id)
-    ) {
+    if (typeof id !== "string" || !/^[a-f0-9]{24}$/i.test(id)) {
         throw new Error(`Invalid ${fieldName}.`);
     }
 
     return id;
 }
 
-// ================== VALIDATE UPLOAD FILES ==================
+// Validate upload files
 function validateUploadFiles(files) {
     const selectedFiles = Array.from(files || []);
 
-    if (
-        selectedFiles.length === 0 ||
-        selectedFiles.length > MAX_FILES
-    ) {
+    if (selectedFiles.length === 0 || selectedFiles.length > MAX_FILES) {
         throw new Error("Select 1 to 3 documents.");
     }
 
@@ -34,39 +29,22 @@ function validateUploadFiles(files) {
             throw new Error("Invalid document selected.");
         }
 
-        const extension = file.name
-            .split(".")
-            .pop()
-            .toLowerCase();
+        const extension = file.name.split(".").pop().toLowerCase();
 
         if (!ALLOWED_EXTENSIONS.includes(extension)) {
-            throw new Error(
-                "Only PDF and Word (.docx) files are allowed."
-            );
+            throw new Error("Only PDF and Word (.docx) files are allowed.");
         }
 
-        if (
-            file.size === 0 ||
-            file.size > MAX_FILE_SIZE
-        ) {
-            throw new Error(
-                `${file.name}: File size must be between 1 byte and 5 MB.`
-            );
+        if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+            throw new Error(`${file.name}: File size must be between 1 byte and 5 MB.`);
         }
     }
 
     return selectedFiles;
 }
 
-// ================== UPLOAD DOCUMENTS ==================
-async function uploadDocuments(
-    files,
-    {
-        conversationId = null,
-        onUploadProgress,
-        signal,
-    } = {}
-) {
+// Upload documents
+async function uploadDocuments(files, { conversationId = null, onUploadProgress, signal } = {}) {
     const selectedFiles = validateUploadFiles(files);
 
     const formData = new FormData();
@@ -76,87 +54,51 @@ async function uploadDocuments(
     });
 
     const endpoint = conversationId
-        ? `/documents/${validateDocumentId(
-            conversationId,
-            "Conversation ID"
-        )}`
+        ? `/documents/${validateDocumentId(conversationId, "Conversation ID")}`
         : "/documents";
 
-    const { data } = await api.post(
-        endpoint,
-        formData,
-        {
-            // Embedding generation can take longer
-            // than normal API requests.
-            timeout: 180000,
+    const { data } = await api.post(endpoint, formData, {
+        // Embedding generation can take longer
+        // than normal API requests.
+        timeout: 180000,
 
-            signal,
+        signal,
 
-            onUploadProgress: (event) => {
-                if (
-                    typeof onUploadProgress !== "function" ||
-                    !event.total
-                ) {
-                    return;
-                }
+        onUploadProgress: (event) => {
+            if (typeof onUploadProgress !== "function" || !event.total) {
+                return;
+            }
 
-                const percentage = Math.min(
-                    100,
-                    Math.round(
-                        (event.loaded / event.total) * 100
-                    )
-                );
+            const percentage = Math.min(100, Math.round((event.loaded / event.total) * 100));
 
-                onUploadProgress(percentage);
-            },
-        }
-    );
+            onUploadProgress(percentage);
+        },
+    });
 
     return data;
 }
 
-// ================== GET CONVERSATION DOCUMENTS ==================
+// Get conversation documents
 async function getDocuments(conversationId, { signal } = {}) {
-    const id = validateDocumentId(
-        conversationId,
-        "Conversation ID"
-    );
+    const id = validateDocumentId(conversationId, "Conversation ID");
 
-    const { data } = await api.get(
-        `/documents/${id}`,
-        {
-            signal,
-        }
-    );
+    const { data } = await api.get(`/documents/${id}`, {
+        signal,
+    });
 
     return data;
 }
 
-// ================== DELETE DOCUMENT ==================
-async function deleteDocument(
-    conversationId,
-    documentId
-) {
-    const validConversationId = validateDocumentId(
-        conversationId,
-        "Conversation ID"
-    );
+// Delete document
+async function deleteDocument(conversationId, documentId) {
+    const validConversationId = validateDocumentId(conversationId, "Conversation ID");
 
-    const validDocumentId = validateDocumentId(
-        documentId,
-        "Document ID"
-    );
+    const validDocumentId = validateDocumentId(documentId, "Document ID");
 
-    const { data } = await api.delete(
-        `/documents/${validConversationId}/${validDocumentId}`
-    );
+    const { data } = await api.delete(`/documents/${validConversationId}/${validDocumentId}`);
 
     return data;
 }
 
-// ================== EXPORTS ==================
-export {
-    uploadDocuments,
-    getDocuments,
-    deleteDocument,
-};
+// Exports
+export { uploadDocuments, getDocuments, deleteDocument };

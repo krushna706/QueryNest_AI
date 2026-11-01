@@ -1,9 +1,8 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== AUTH SESSION SCHEMA ==================
+// Auth session schema
 const authSessionSchema = new Schema(
     {
         userId: {
@@ -36,19 +35,16 @@ const authSessionSchema = new Schema(
     }
 );
 
-// ================== SESSION INDEXES ==================
-authSessionSchema.index(
-    { expiresAt: 1 },
-    { expireAfterSeconds: 0 }
-);
+// Session indexes
+authSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 authSessionSchema.index({
     userId: 1,
     revokedAt: 1,
 });
 
-// ================== MODEL ==================
+// Model
 const AuthSession = mongoose.model("AuthSession", authSessionSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = AuthSession;

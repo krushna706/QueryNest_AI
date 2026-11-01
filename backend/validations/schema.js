@@ -1,22 +1,15 @@
-
 const Joi = require("joi");
 
-// ================== COMMON EMAIL RULE ==================
-const emailRule = Joi.string()
-    .trim()
-    .lowercase()
-    .email()
-    .max(254)
-    .required()
-    .messages({
-        "string.base": "Email must be a string.",
-        "string.empty": "Email is required.",
-        "string.email": "Enter a valid email address.",
-        "string.max": "Email cannot exceed 254 characters.",
-        "any.required": "Email is required.",
-    });
+// Common email rule
+const emailRule = Joi.string().trim().lowercase().email().max(254).required().messages({
+    "string.base": "Email must be a string.",
+    "string.empty": "Email is required.",
+    "string.email": "Enter a valid email address.",
+    "string.max": "Email cannot exceed 254 characters.",
+    "any.required": "Email is required.",
+});
 
-// ================== COMMON PHONE RULE ==================
+// Common phone rule
 const phoneRule = Joi.string()
     .trim()
     .pattern(/^[6-9]\d{9}$/)
@@ -28,7 +21,7 @@ const phoneRule = Joi.string()
         "any.required": "Phone number is required.",
     });
 
-// ================== COMMON PASSWORD RULE ==================
+// Common password rule
 const passwordRule = Joi.string()
     .max(72)
     .custom((value, helpers) => {
@@ -47,52 +40,39 @@ const passwordRule = Joi.string()
         "any.required": "Password is required.",
     });
 
-// ================== ACCOUNT IDENTIFIER ==================
-const identifierRule = Joi.alternatives()
-    .try(emailRule, phoneRule)
-    .required()
-    .messages({
-        "alternatives.match": "Enter a valid email address or 10-digit Indian mobile number.",
-        "any.required": "Email address or phone number is required.",
-    });
+// Account identifier
+const identifierRule = Joi.alternatives().try(emailRule, phoneRule).required().messages({
+    "alternatives.match": "Enter a valid email address or 10-digit Indian mobile number.",
+    "any.required": "Email address or phone number is required.",
+});
 
-// ================== SIGNUP VALIDATION ==================
+// Signup validation
 const signupSchema = Joi.object({
-    name: Joi.string()
-        .trim()
-        .min(2)
-        .max(100)
-        .required()
-        .messages({
-            "string.empty": "Name is required.",
-            "string.min": "Name must contain at least 2 characters.",
-            "string.max": "Name cannot exceed 100 characters.",
-            "any.required": "Name is required.",
-        }),
+    name: Joi.string().trim().min(2).max(100).required().messages({
+        "string.empty": "Name is required.",
+        "string.min": "Name must contain at least 2 characters.",
+        "string.max": "Name cannot exceed 100 characters.",
+        "any.required": "Name is required.",
+    }),
 
     email: emailRule,
 
     phone: phoneRule,
 
-    password: passwordRule
-        .min(6)
-        .messages({
-            "string.min": "Password must contain at least 6 characters.",
-        }),
+    password: passwordRule.min(6).messages({
+        "string.min": "Password must contain at least 6 characters.",
+    }),
 
-    confirmPassword: Joi.string()
-        .valid(Joi.ref("password"))
-        .required()
-        .messages({
-            "string.empty": "Confirm your password.",
-            "any.only": "Passwords do not match.",
-            "any.required": "Confirm password is required.",
-        }),
+    confirmPassword: Joi.string().valid(Joi.ref("password")).required().messages({
+        "string.empty": "Confirm your password.",
+        "any.only": "Passwords do not match.",
+        "any.required": "Confirm password is required.",
+    }),
 })
     .required()
     .unknown(false);
 
-// ================== LOGIN VALIDATION ==================
+// Login validation
 const loginSchema = Joi.object({
     identifier: identifierRule,
     password: passwordRule,
@@ -100,14 +80,14 @@ const loginSchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== REQUEST PASSWORD OTP ==================
+// Request password otp
 const forgotPasswordRequestSchema = Joi.object({
     identifier: identifierRule,
 })
     .required()
     .unknown(false);
 
-// ================== VERIFY PASSWORD OTP ==================
+// Verify password otp
 const forgotPasswordVerifySchema = Joi.object({
     identifier: identifierRule,
 
@@ -124,7 +104,7 @@ const forgotPasswordVerifySchema = Joi.object({
     .required()
     .unknown(false);
 
-// ================== RESET PASSWORD ==================
+// Reset password
 const forgotPasswordResetSchema = Joi.object({
     resetToken: Joi.string()
         .pattern(/^[a-f0-9]{64}$/)
@@ -135,34 +115,22 @@ const forgotPasswordResetSchema = Joi.object({
             "any.required": "Reset authorization is required.",
         }),
 
-    newPassword: passwordRule
-        .min(6)
-        .messages({
-            "string.min": "Password must contain at least 6 characters.",
-        }),
+    newPassword: passwordRule.min(6).messages({
+        "string.min": "Password must contain at least 6 characters.",
+    }),
 
-    confirmPassword: Joi.string()
-        .valid(Joi.ref("newPassword"))
-        .required()
-        .messages({
-            "string.empty": "Confirm your new password.",
-            "any.only": "Passwords do not match.",
-            "any.required": "Confirm password is required.",
-        }),
+    confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+        "string.empty": "Confirm your new password.",
+        "any.only": "Passwords do not match.",
+        "any.required": "Confirm password is required.",
+    }),
 })
     .required()
     .unknown(false);
 
-// ================== DOCUMENT ATTACHMENT RULE ==================
+// Document attachment rule
 const attachmentIdsRule = Joi.array()
-    .items(
-        Joi.string()
-            .trim()
-            .lowercase()
-            .hex()
-            .length(24)
-            .required()
-    )
+    .items(Joi.string().trim().lowercase().hex().length(24).required())
     .max(3)
     .unique()
     .default([])
@@ -172,103 +140,76 @@ const attachmentIdsRule = Joi.array()
         "array.unique": "Duplicate documents are not allowed.",
     });
 
-// ================== CHAT MESSAGE VALIDATION ==================
+// Chat message validation
 const chatMessageSchema = Joi.object({
-    content: Joi.string()
-        .trim()
-        .min(1)
-        .max(100000)
-        .required()
-        .messages({
-            "string.empty": "Message cannot be empty.",
-            "string.min": "Message cannot be empty.",
-            "string.max": "Message is too long.",
-            "any.required": "Message is required.",
-        }),
+    content: Joi.string().trim().min(1).max(100000).required().messages({
+        "string.empty": "Message cannot be empty.",
+        "string.min": "Message cannot be empty.",
+        "string.max": "Message is too long.",
+        "any.required": "Message is required.",
+    }),
 
-    clientRequestId: Joi.string()
-        .guid({ version: "uuidv4" })
-        .required()
-        .messages({
-            "string.guid": "Invalid request identifier.",
-            "any.required": "Request identifier is required.",
-        }),
+    clientRequestId: Joi.string().guid({ version: "uuidv4" }).required().messages({
+        "string.guid": "Invalid request identifier.",
+        "any.required": "Request identifier is required.",
+    }),
 
-    // ================== OPTIONAL DOCUMENTS ==================
+    // Optional documents
     attachmentIds: attachmentIdsRule,
 })
     .required()
     .unknown(false);
 
-// ================== GENERATE AI VALIDATION ==================
+// Generate ai validation
 const generateAISchema = Joi.object({
-    messageId: Joi.string()
-        .hex()
-        .length(24)
-        .required()
-        .messages({
-            "string.hex": "Invalid user message ID.",
-            "string.length": "Invalid user message ID.",
-            "any.required": "User message ID is required.",
-        }),
+    messageId: Joi.string().hex().length(24).required().messages({
+        "string.hex": "Invalid user message ID.",
+        "string.length": "Invalid user message ID.",
+        "any.required": "User message ID is required.",
+    }),
 
-    regenerate: Joi.boolean()
-        .strict()
-        .default(false)
-        .messages({
-            "boolean.base": "Regenerate must be a boolean.",
-        }),
+    regenerate: Joi.boolean().strict().default(false).messages({
+        "boolean.base": "Regenerate must be a boolean.",
+    }),
 })
     .required()
     .unknown(false);
 
-// ================== RENAME CONVERSATION ==================
+// Rename conversation
 const renameConversationSchema = Joi.object({
-    title: Joi.string()
-        .trim()
-        .min(1)
-        .max(120)
-        .required()
-        .messages({
-            "string.empty": "Conversation title is required.",
-            "string.min": "Conversation title cannot be empty.",
-            "string.max": "Title cannot exceed 120 characters.",
-            "any.required": "Conversation title is required.",
-        }),
+    title: Joi.string().trim().min(1).max(120).required().messages({
+        "string.empty": "Conversation title is required.",
+        "string.min": "Conversation title cannot be empty.",
+        "string.max": "Title cannot exceed 120 characters.",
+        "any.required": "Conversation title is required.",
+    }),
 })
     .required()
     .unknown(false);
 
-// ================== CONVERSATION ID ==================
+// Conversation id
 const conversationParamsSchema = Joi.object({
-    conversationId: Joi.string()
-        .hex()
-        .length(24)
-        .required()
-        .messages({
-            "string.hex": "Invalid conversation ID.",
-            "string.length": "Invalid conversation ID.",
-            "any.required": "Conversation ID is required.",
-        }),
+    conversationId: Joi.string().hex().length(24).required().messages({
+        "string.hex": "Invalid conversation ID.",
+        "string.length": "Invalid conversation ID.",
+        "any.required": "Conversation ID is required.",
+    }),
 })
     .required()
     .unknown(false);
 
-// ================== DOCUMENT ID PARAMS ==================
-const deleteDocumentParamsSchema = conversationParamsSchema.keys({
-    documentId: Joi.string()
-        .hex()
-        .length(24)
-        .required()
-        .messages({
+// Document id params
+const deleteDocumentParamsSchema = conversationParamsSchema
+    .keys({
+        documentId: Joi.string().hex().length(24).required().messages({
             "string.hex": "Invalid document ID.",
             "string.length": "Invalid document ID.",
             "any.required": "Document ID is required.",
         }),
-}).unknown(false);
+    })
+    .unknown(false);
 
-
-// ================== PROFILE NAME VALIDATION ==================
+// Profile name validation
 const updateProfileSchema = Joi.object({
     name: Joi.string()
         .trim()
@@ -287,45 +228,27 @@ const updateProfileSchema = Joi.object({
     .required()
     .unknown(false);
 
-
-// ================== CHAT HISTORY QUERY ==================
+// Chat history query
 const chatHistoryQuerySchema = Joi.object({
-    search: Joi.string()
-        .trim()
-        .max(120)
-        .allow("")
-        .default(""),
+    search: Joi.string().trim().max(120).allow("").default(""),
 
-    cursor: Joi.string()
-        .max(256)
-        .optional(),
+    cursor: Joi.string().max(256).optional(),
 
-    limit: Joi.number()
-        .integer()
-        .min(1)
-        .max(50)
-        .default(20),
+    limit: Joi.number().integer().min(1).max(50).default(20),
 })
     .required()
     .unknown(false);
 
-// ================== MESSAGE HISTORY QUERY ==================
+// Message history query
 const messageHistoryQuerySchema = Joi.object({
-    before: Joi.string()
-        .hex()
-        .length(24)
-        .optional(),
+    before: Joi.string().hex().length(24).optional(),
 
-    limit: Joi.number()
-        .integer()
-        .min(1)
-        .max(50)
-        .default(20),
+    limit: Joi.number().integer().min(1).max(50).default(20),
 })
     .required()
     .unknown(false);
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     signupSchema,
     loginSchema,

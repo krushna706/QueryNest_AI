@@ -5,14 +5,19 @@ const userController = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const validateMiddleware = require("../middleware/validateMiddleware");
 const { handleAvatarUpload } = require("../middleware/uploadMiddleware");
-const { profileReadLimiter, profileUpdateLimiter, avatarUploadLimiter, clearHistoryLimiter } = require("../middleware/rateLimiter");
+const {
+    profileReadLimiter,
+    profileUpdateLimiter,
+    avatarUploadLimiter,
+    clearHistoryLimiter,
+} = require("../middleware/rateLimiter");
 
 const { updateProfileSchema } = require("../validations/schema");
 
-// ================== ROUTER SETUP ==================
+// Router setup
 const router = express.Router();
 
-// ================== AUTHENTICATION ==================
+// Authentication
 router.use(authMiddleware);
 
 // GET /api/users/profile

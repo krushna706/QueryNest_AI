@@ -1,7 +1,6 @@
-
 const mongoose = require("mongoose");
 
-// ================== DATABASE CONNECTION ==================
+// Database connection
 // Connect MongoDB before the server starts accepting requests.
 async function connectDB() {
     const dbURI = process.env.DB_URI;
@@ -20,5 +19,5 @@ async function connectDB() {
     console.log("MongoDB connected successfully.");
 }
 
-// ================== EXPORT ==================
+// Export
 module.exports = connectDB;

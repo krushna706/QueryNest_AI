@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { useAuth } from "../../context/AuthContext";
 
-// ================== SIDEBAR CONTENT ==================
+// Sidebar content
 function SidebarContent({
     isMobile = false,
     onClose,
@@ -99,10 +99,7 @@ function SidebarContent({
 
             toast.success("Logged out successfully.");
         } catch (error) {
-            toast.error(
-                error.response?.data?.message ||
-                "Unable to logout. Please try again."
-            );
+            toast.error(error.response?.data?.message || "Unable to logout. Please try again.");
         } finally {
             setLoggingOut(false);
         }
@@ -112,17 +109,17 @@ function SidebarContent({
         <>
             <div className="chat-sidebar-header">
                 <Link to="/chat" className="chat-sidebar-brand" onClick={onClose} aria-label="QueryNest AI Home">
-                    <img src="/images/QueryNest_AI_Logo.png" alt="QueryNest AI" className="chat-brand-logo qn-chat-brand-image" />
+                    <img
+                        src="/images/QueryNest_AI_Logo.png"
+                        alt="QueryNest AI"
+                        className="chat-brand-logo qn-chat-brand-image"
+                    />
                 </Link>
 
                 <IconButton
                     type="button"
                     className="chat-sidebar-toggle"
-                    aria-label={
-                        isMobile
-                            ? "Close sidebar"
-                            : "Collapse sidebar"
-                    }
+                    aria-label={isMobile ? "Close sidebar" : "Collapse sidebar"}
                     onClick={isMobile ? onClose : onToggle}
                 >
                     <i className="fa-solid fa-bars" aria-hidden="true" />
@@ -154,17 +151,9 @@ function SidebarContent({
                 />
             </div>
             <nav className="chat-sidebar-history" aria-label="Chat history">
-                <p className="chat-sidebar-label">
-                    YOUR CONVERSATIONS
-                </p>
+                <p className="chat-sidebar-label">YOUR CONVERSATIONS</p>
 
-                {guestMode ? (
-                    <p className="chat-sidebar-empty">
-                        Sign in to access your conversations.
-                    </p>
-                ) : (
-                    children
-                )}
+                {guestMode ? <p className="chat-sidebar-empty">Sign in to access your conversations.</p> : children}
             </nav>
             <div className="chat-sidebar-bottom">
                 <button
@@ -172,40 +161,24 @@ function SidebarContent({
                     className="chat-account-button"
                     onClick={handleOpenMenu}
                     disabled={loggingOut}
-                    aria-label={
-                        guestMode
-                            ? "Sign in to QueryNest AI"
-                            : `Account menu for ${userName}`
-                    }
-                    aria-haspopup={
-                        guestMode ? "dialog" : "menu"
-                    }
-                    aria-expanded={
-                        guestMode ? undefined : menuOpen
-                    }
-                    aria-controls={
-                        !guestMode && menuOpen
-                            ? "chat-account-menu"
-                            : undefined
-                    }
+                    aria-label={guestMode ? "Sign in to QueryNest AI" : `Account menu for ${userName}`}
+                    aria-haspopup={guestMode ? "dialog" : "menu"}
+                    aria-expanded={guestMode ? undefined : menuOpen}
+                    aria-controls={!guestMode && menuOpen ? "chat-account-menu" : undefined}
                 >
-                    <Avatar src={ !guestMode && avatarUrl ? avatarUrl : undefined } alt={userName} className="chat-account-avatar">
-                        {guestMode ? (
-                            <i className="fa-regular fa-user" aria-hidden="true" />
-                        ) : (
-                            !avatarUrl && initials
-                        )}
+                    <Avatar
+                        src={!guestMode && avatarUrl ? avatarUrl : undefined}
+                        alt={userName}
+                        className="chat-account-avatar"
+                    >
+                        {guestMode ? <i className="fa-regular fa-user" aria-hidden="true" /> : !avatarUrl && initials}
                     </Avatar>
 
                     <span className="chat-account-details">
-                        <span className="chat-account-name">
-                            {guestMode ? "Sign In" : userName}
-                        </span>
+                        <span className="chat-account-name">{guestMode ? "Sign In" : userName}</span>
 
                         <span className="chat-account-email">
-                            {guestMode
-                                ? "Log in or create an account"
-                                : userEmail}
+                            {guestMode ? "Log in or create an account" : userEmail}
                         </span>
                     </span>
 
@@ -252,19 +225,23 @@ function SidebarContent({
 
                     <div className="chat-account-menu-divider" />
 
-                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/chat") }>
+                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/chat")}>
                         <i className="fa-solid fa-house" aria-hidden="true" />
                         <span>Dashboard</span>
                     </MenuItem>
 
-                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/profile") }>
+                    <MenuItem className="chat-account-menu-item" onClick={() => handleNavigation("/profile")}>
                         <i className="fa-regular fa-user" aria-hidden="true" />
                         <span>My Profile</span>
                     </MenuItem>
 
                     <div className="chat-account-menu-divider" />
 
-                    <MenuItem className="chat-account-menu-item chat-account-logout" onClick={handleLogout} disabled={loggingOut}>
+                    <MenuItem
+                        className="chat-account-menu-item chat-account-logout"
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                    >
                         <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />
                         <span>Logout</span>
                     </MenuItem>
@@ -274,7 +251,7 @@ function SidebarContent({
     );
 }
 
-// ================== CHAT SIDEBAR ==================
+// Chat sidebar
 function ChatSidebar({
     isMobile = false,
     mobileOpen = false,
@@ -287,9 +264,7 @@ function ChatSidebar({
     onSearchChange = () => {},
     children,
 }) {
-    const reduceMotion = useMediaQuery(
-        "(prefers-reduced-motion: reduce)"
-    );
+    const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
     const sidebarContent = (
         <SidebarContent
@@ -312,16 +287,11 @@ function ChatSidebar({
                 anchor="left"
                 open={mobileOpen}
                 onClose={onClose}
-                transitionDuration={
-                    reduceMotion
-                        ? 0
-                        : { enter: 350, exit: 300 }
-                }
+                transitionDuration={reduceMotion ? 0 : { enter: 350, exit: 300 }}
                 slotProps={{
                     paper: {
                         id: "chat-sidebar",
-                        className:
-                            "chat-sidebar chat-sidebar-drawer",
+                        className: "chat-sidebar chat-sidebar-drawer",
                         "aria-label": "Chat navigation",
                     },
                 }}

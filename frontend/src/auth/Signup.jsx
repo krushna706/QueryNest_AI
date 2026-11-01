@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import AuthLayout from "../layouts/AuthLayout";
 import { useAuth } from "../context/AuthContext";
 
-// ================== SIGNUP ERROR MESSAGE ==================
+// Signup error message
 function getSignupErrorMessage(error) {
     if (error.response?.status === 429) {
         const retryAfter = error.response.headers?.["retry-after"];
@@ -36,7 +36,7 @@ function getSignupErrorMessage(error) {
     return error.response.data?.message || "Unable to create your account. Please try again.";
 }
 
-// ================== SIGNUP PAGE ==================
+// Signup page
 function Signup() {
     const navigate = useNavigate();
     const { signup, loading } = useAuth();
@@ -69,11 +69,7 @@ function Signup() {
             return;
         }
 
-        if (
-            !email ||
-            email.length > 254 ||
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-        ) {
+        if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             toast.error("Enter a valid email address.");
             return;
         }
@@ -217,7 +213,10 @@ function Signup() {
                                         onMouseDown={(event) => event.preventDefault()}
                                         edge="end"
                                     >
-                                        <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
+                                        <i
+                                            className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`}
+                                            aria-hidden="true"
+                                        />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -248,13 +247,18 @@ function Signup() {
                                         type="button"
                                         className="auth-password-toggle"
                                         disabled={formDisabled}
-                                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                                        aria-label={
+                                            showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                                        }
                                         aria-pressed={showConfirmPassword}
                                         onClick={() => setShowConfirmPassword((current) => !current)}
                                         onMouseDown={(event) => event.preventDefault()}
                                         edge="end"
                                     >
-                                        <i className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`} aria-hidden="true" />
+                                        <i
+                                            className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`}
+                                            aria-hidden="true"
+                                        />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -263,12 +267,15 @@ function Signup() {
                 />
 
                 {/* Submit */}
-                <Button type="submit" variant="contained" className="auth-submit" disabled={formDisabled} disableElevation fullWidth>
-                    {loading
-                        ? "Checking session..."
-                        : isSubmitting
-                          ? "Creating account..."
-                          : "Create Account"}
+                <Button
+                    type="submit"
+                    variant="contained"
+                    className="auth-submit"
+                    disabled={formDisabled}
+                    disableElevation
+                    fullWidth
+                >
+                    {loading ? "Checking session..." : isSubmitting ? "Creating account..." : "Create Account"}
 
                     <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </Button>
@@ -277,10 +284,7 @@ function Signup() {
             {/* Account Link */}
             <div className="auth-account-row auth-account-row-center">
                 <p className="auth-switch">
-                    Already have an account?{" "}
-                    <Link to="/login">
-                        Sign In
-                    </Link>
+                    Already have an account? <Link to="/login">Sign In</Link>
                 </p>
             </div>
         </AuthLayout>

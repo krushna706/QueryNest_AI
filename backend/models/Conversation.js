@@ -1,9 +1,8 @@
-
 const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
-// ================== CONVERSATION SCHEMA ==================
+// Conversation schema
 const conversationSchema = new Schema(
     {
         userId: {
@@ -13,7 +12,7 @@ const conversationSchema = new Schema(
             immutable: true,
         },
 
-        // ================== CONVERSATION DETAILS ==================
+        // Conversation details
         title: {
             type: String,
             required: true,
@@ -40,7 +39,7 @@ const conversationSchema = new Schema(
     }
 );
 
-// ================== DATABASE INDEXES ==================
+// Database indexes
 conversationSchema.index({
     userId: 1,
     status: 1,
@@ -48,11 +47,8 @@ conversationSchema.index({
     _id: -1,
 });
 
-// ================== MODEL ==================
-const Conversation = mongoose.model(
-    "Conversation",
-    conversationSchema
-);
+// Model
+const Conversation = mongoose.model("Conversation", conversationSchema);
 
-// ================== EXPORT ==================
+// Export
 module.exports = Conversation;

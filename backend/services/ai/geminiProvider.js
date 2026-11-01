@@ -1,10 +1,9 @@
-
 const { GoogleGenAI } = require("@google/genai");
 
 const { getAIProviderConfig } = require("../../config/aiProviders");
 const { APP_USAGE_LIMITS } = require("../../config/usageLimits");
 
-// ================== PREPARE GEMINI MESSAGES ==================
+// Prepare gemini messages
 function prepareGeminiMessages(messages, systemInstruction) {
     if (!Array.isArray(messages) || messages.length === 0) {
         throw new Error("AI messages are required.");
@@ -47,7 +46,7 @@ function prepareGeminiMessages(messages, systemInstruction) {
     };
 }
 
-// ================== NORMALIZE TOKEN USAGE ==================
+// Normalize token usage
 function normalizeGeminiUsage(usage) {
     if (!usage || typeof usage !== "object") return null;
 
@@ -55,12 +54,13 @@ function normalizeGeminiUsage(usage) {
     const candidateTokens = usage.candidatesTokenCount ?? 0;
     const thinkingTokens = usage.thoughtsTokenCount ?? 0;
 
-    const totalTokens = usage.totalTokenCount ??
-        (inputTokens + candidateTokens + thinkingTokens);
+    const totalTokens = usage.totalTokenCount ?? inputTokens + candidateTokens + thinkingTokens;
 
     if (
-        !Number.isSafeInteger(inputTokens) || inputTokens < 0 ||
-        !Number.isSafeInteger(totalTokens) || totalTokens < inputTokens
+        !Number.isSafeInteger(inputTokens) ||
+        inputTokens < 0 ||
+        !Number.isSafeInteger(totalTokens) ||
+        totalTokens < inputTokens
     ) {
         return null;
     }
@@ -74,15 +74,13 @@ function normalizeGeminiUsage(usage) {
     };
 }
 
-// ================== STREAM GEMINI RESPONSE ==================
+// Stream gemini response
 async function* streamGeminiResponse({
     messages,
     systemInstruction = "",
     maxOutputTokens = APP_USAGE_LIMITS.maxOutputTokensPerRequest,
     signal,
 } = {}) {
-
-    // ================== VALIDATE OUTPUT LIMIT ==================
     if (
         !Number.isSafeInteger(maxOutputTokens) ||
         maxOutputTokens < 1 ||
@@ -95,11 +93,7 @@ async function* streamGeminiResponse({
         throw new Error("Generation stopped.");
     }
 
-    // ================== PREPARE REQUEST ==================
-    const {
-        contents,
-        systemInstruction: instruction,
-    } = prepareGeminiMessages(messages, systemInstruction);
+    const { contents, systemInstruction: instruction } = prepareGeminiMessages(messages, systemInstruction);
 
     const { apiKey, model } = getAIProviderConfig("gemini");
 
@@ -108,16 +102,11 @@ async function* streamGeminiResponse({
     const config = {
         maxOutputTokens,
 
-        ...(instruction
-            ? { systemInstruction: instruction }
-            : {}),
+        ...(instruction ? { systemInstruction: instruction } : {}),
 
-        ...(signal
-            ? { abortSignal: signal }
-            : {}),
+        ...(signal ? { abortSignal: signal } : {}),
     };
 
-    // ================== CREATE STREAM ==================
     const stream = await client.models.generateContentStream({
         model,
         contents,
@@ -127,7 +116,6 @@ async function* streamGeminiResponse({
     let finishReason = "unknown";
     let lastUsage = null;
 
-    // ================== PROCESS STREAM ==================
     for await (const chunk of stream) {
         if (signal?.aborted) {
             throw new Error("Generation stopped.");
@@ -136,21 +124,14 @@ async function* streamGeminiResponse({
         const candidate = chunk?.candidates?.[0];
         const parts = candidate?.content?.parts;
 
-        // ================== RESPONSE TEXT ==================
         const text = Array.isArray(parts)
             ? parts
-                .filter(
-                    (part) =>
-                        !part?.thought &&
-                        typeof part?.text === "string"
-                )
-                .map((part) => part.text)
-                .join("")
-            : (
-                typeof chunk?.text === "string"
-                    ? chunk.text
-                    : ""
-            );
+                  .filter((part) => !part?.thought && typeof part?.text === "string")
+                  .map((part) => part.text)
+                  .join("")
+            : typeof chunk?.text === "string"
+              ? chunk.text
+              : "";
 
         if (text) {
             yield {
@@ -159,24 +140,17 @@ async function* streamGeminiResponse({
             };
         }
 
-        // ================== FINISH REASON ==================
         if (candidate?.finishReason) {
             const reason = candidate.finishReason;
 
-            finishReason = reason === "STOP"
-                ? "stop"
-                : reason === "MAX_TOKENS"
-                    ? "length"
-                    : reason.toLowerCase();
+            finishReason = reason === "STOP" ? "stop" : reason === "MAX_TOKENS" ? "length" : reason.toLowerCase();
         }
 
-        // ================== TOKEN USAGE ==================
         if (chunk?.usageMetadata) {
             lastUsage = chunk.usageMetadata;
         }
     }
 
-    // ================== STREAM COMPLETED ==================
     if (signal?.aborted) {
         throw new Error("Generation stopped.");
     }
@@ -195,7 +169,7 @@ async function* streamGeminiResponse({
     };
 }
 
-// ================== EXPORTS ==================
+// Exports
 module.exports = {
     streamGeminiResponse,
 };

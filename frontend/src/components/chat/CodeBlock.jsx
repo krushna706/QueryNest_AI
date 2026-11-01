@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-// ================== LANGUAGE ALIASES ==================
+// Language aliases
 const LANGUAGE_ALIASES = {
     js: "javascript",
     ts: "typescript",
@@ -16,7 +16,7 @@ const LANGUAGE_ALIASES = {
     plaintext: "text",
 };
 
-// ================== NORMALIZE LANGUAGE ==================
+// Normalize language
 function normalizeLanguage(language) {
     if (typeof language !== "string") {
         return "text";
@@ -31,15 +31,13 @@ function normalizeLanguage(language) {
     return LANGUAGE_ALIASES[value] || value;
 }
 
-// ================== CODE BLOCK ==================
+// Code block
 function CodeBlock({ code = "", language = "text" }) {
     const [copyStatus, setCopyStatus] = useState("idle");
 
     const copyTimeoutRef = useRef(null);
 
-    const codeText = typeof code === "string"
-        ? code.replace(/\n$/, "")
-        : String(code ?? "");
+    const codeText = typeof code === "string" ? code.replace(/\n$/, "") : String(code ?? "");
 
     const normalizedLanguage = normalizeLanguage(language);
 
@@ -76,11 +74,7 @@ function CodeBlock({ code = "", language = "text" }) {
     return (
         <div className="chat-code-block qn-code-frame">
             <div className="chat-code-header qn-code-toolbar">
-                <span className="qn-code-language">
-                    {normalizedLanguage === "text"
-                        ? "Code"
-                        : normalizedLanguage}
-                </span>
+                <span className="qn-code-language">{normalizedLanguage === "text" ? "Code" : normalizedLanguage}</span>
                 <button
                     type="button"
                     className={`chat-code-copy qn-code-copy-button${copyStatus === "copied" ? " qn-code-copied" : ""}`}
@@ -88,14 +82,13 @@ function CodeBlock({ code = "", language = "text" }) {
                     aria-label="Copy code to clipboard"
                     title="Copy code"
                 >
-                    <i className={ copyStatus === "copied" ? "fa-solid fa-check" : "fa-regular fa-copy" } aria-hidden="true" />
+                    <i
+                        className={copyStatus === "copied" ? "fa-solid fa-check" : "fa-regular fa-copy"}
+                        aria-hidden="true"
+                    />
 
                     <span aria-live="polite">
-                        {copyStatus === "copied"
-                            ? "Copied"
-                            : copyStatus === "failed"
-                                ? "Copy failed"
-                                : "Copy"}
+                        {copyStatus === "copied" ? "Copied" : copyStatus === "failed" ? "Copy failed" : "Copy"}
                     </span>
                 </button>
             </div>
@@ -119,8 +112,7 @@ function CodeBlock({ code = "", language = "text" }) {
                 }}
                 codeTagProps={{
                     style: {
-                        fontFamily:
-                            "Consolas, Monaco, 'Courier New', monospace",
+                        fontFamily: "Consolas, Monaco, 'Courier New', monospace",
                     },
                 }}
             >
@@ -130,5 +122,5 @@ function CodeBlock({ code = "", language = "text" }) {
     );
 }
 
-// ================== EXPORT ==================
+// Export
 export default CodeBlock;

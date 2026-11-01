@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import AuthLayout from "../layouts/AuthLayout";
 import { useAuth } from "../context/AuthContext";
 
-// ================== LOGIN ERROR MESSAGE ==================
+// Login error message
 function getLoginErrorMessage(error) {
     if (error.response?.status === 429) {
         const retryAfter = error.response.headers?.["retry-after"];
@@ -36,7 +36,7 @@ function getLoginErrorMessage(error) {
     return error.response.data?.message || "Unable to login. Please try again.";
 }
 
-// ================== LOGIN PAGE ==================
+// Login page
 function Login() {
     const { login, loading } = useAuth();
 
@@ -68,10 +68,7 @@ function Login() {
         const isEmail = identifier.includes("@");
 
         if (isEmail) {
-            if (
-                identifier.length > 254 ||
-                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
-            ) {
+            if (identifier.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
                 toast.error("Enter a valid email address.");
                 return;
             }
@@ -149,22 +146,17 @@ function Login() {
                                         type="button"
                                         className="auth-password-toggle"
                                         disabled={formDisabled}
-                                        aria-label={
-                                            showPassword
-                                                ? "Hide password"
-                                                : "Show password"
-                                        }
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
                                         aria-pressed={showPassword}
                                         aria-controls="login-password"
-                                        onClick={() =>
-                                            setShowPassword((current) => !current)
-                                        }
-                                        onMouseDown={(event) =>
-                                            event.preventDefault()
-                                        }
+                                        onClick={() => setShowPassword((current) => !current)}
+                                        onMouseDown={(event) => event.preventDefault()}
                                         edge="end"
                                     >
-                                        <i className={`fa-solid ${ showPassword ? "fa-eye-slash" : "fa-eye" }`} aria-hidden="true" />
+                                        <i
+                                            className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`}
+                                            aria-hidden="true"
+                                        />
                                     </IconButton>
                                 </InputAdornment>
                             ),
@@ -173,12 +165,15 @@ function Login() {
                 />
 
                 {/* Submit */}
-                <Button type="submit" variant="contained" className="auth-submit" disabled={formDisabled} disableElevation fullWidth>
-                    {loading
-                        ? "Checking session..."
-                        : isSubmitting
-                          ? "Signing in..."
-                          : "Sign In"}
+                <Button
+                    type="submit"
+                    variant="contained"
+                    className="auth-submit"
+                    disabled={formDisabled}
+                    disableElevation
+                    fullWidth
+                >
+                    {loading ? "Checking session..." : isSubmitting ? "Signing in..." : "Sign In"}
 
                     <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </Button>
@@ -187,10 +182,7 @@ function Login() {
             {/* Account Links */}
             <div className="auth-account-row">
                 <p className="auth-switch">
-                    New here?{" "}
-                    <Link to="/signup">
-                        Create an account
-                    </Link>
+                    New here? <Link to="/signup">Create an account</Link>
                 </p>
 
                 <Link to="/forgot-password" className="auth-forgot-link">

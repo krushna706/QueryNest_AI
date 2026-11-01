@@ -1,18 +1,18 @@
 import axios from "axios";
 
-// ================== API CONFIGURATION ==================
+// Api configuration
 const baseURL = import.meta.env.VITE_API_URL?.trim();
 
 if (!baseURL) {
     throw new Error("VITE_API_URL is missing in frontend environment configuration.");
 }
 
-// ================== SHARED AXIOS INSTANCE ==================
+// Shared axios instance
 const api = axios.create({
     baseURL,
     withCredentials: true,
     timeout: 15000,
 });
 
-// ================== EXPORT ==================
+// Export
 export default api;
