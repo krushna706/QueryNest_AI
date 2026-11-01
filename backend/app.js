@@ -92,6 +92,16 @@ app.use(cookieParser());
 // Csrf protection
 app.use("/api", csrfMiddleware);
 
+if (req.query.proxyCheck === "1") {
+    console.log("Proxy check:", JSON.stringify({
+        trustProxy: app.get("trust proxy"),
+        clientIp: req.ip,
+        socketIp: req.socket.remoteAddress,
+        forwardedFor: req.get("x-forwarded-for"),
+        protocol: req.protocol,
+    }));
+}
+
 // Health check
 app.get("/api/health", (req, res) => {
     return res.status(200).json({
