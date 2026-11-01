@@ -94,16 +94,18 @@ app.use("/api", csrfMiddleware);
 
 // Health check
 app.get("/api/health", (req, res) => {
-
+    // Temporarily uncomment to verify proxy settings using ?proxyCheck=1.
+    /*
     if (req.query.proxyCheck === "1") {
-    console.log("Proxy check:", JSON.stringify({
-        trustProxy: app.get("trust proxy"),
-        clientIp: req.ip,
-        socketIp: req.socket.remoteAddress,
-        forwardedFor: req.get("x-forwarded-for"),
-        protocol: req.protocol,
-    }));
-  }
+        console.log("Proxy check:", JSON.stringify({
+            trustProxy: app.get("trust proxy"),
+            clientIp: req.ip,
+            socketIp: req.socket.remoteAddress,
+            forwardedFor: req.get("x-forwarded-for"),
+            protocol: req.protocol,
+        }));
+    }
+    */
 
     return res.status(200).json({
         success: true,
