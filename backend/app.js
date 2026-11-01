@@ -92,7 +92,10 @@ app.use(cookieParser());
 // Csrf protection
 app.use("/api", csrfMiddleware);
 
-if (req.query.proxyCheck === "1") {
+// Health check
+app.get("/api/health", (req, res) => {
+
+    if (req.query.proxyCheck === "1") {
     console.log("Proxy check:", JSON.stringify({
         trustProxy: app.get("trust proxy"),
         clientIp: req.ip,
@@ -100,10 +103,8 @@ if (req.query.proxyCheck === "1") {
         forwardedFor: req.get("x-forwarded-for"),
         protocol: req.protocol,
     }));
-}
+  }
 
-// Health check
-app.get("/api/health", (req, res) => {
     return res.status(200).json({
         success: true,
         message: "QueryNest AI API is running.",
